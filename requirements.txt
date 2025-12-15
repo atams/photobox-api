@@ -1,0 +1,13 @@
+# ATAMS Toolkit (includes fastapi, sqlalchemy, pydantic, email-validator, etc.)
+atams>=1.0.0
+
+# Database Driver (choose based on your database)
+psycopg2-binary>=2.9.0  # PostgreSQL
+# mysqlclient>=2.2.0    # MySQL
+# cx_Oracle>=8.3.0      # Oracle
+
+# FastAPI Server
+uvicorn[standard]>=0.24.0
+
+# Environment variables
+python-dotenv>=1.0.0
