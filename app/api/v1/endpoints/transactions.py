@@ -32,10 +32,12 @@ async def create_transaction(
     Create a new transaction and generate QRIS
 
     - **location_id**: Location ID (required, must be active)
+    - **price_id**: Price ID (required, must be active with available quota)
 
     **Notes:**
-    - Amount is fixed at 40000
+    - Amount is determined by the price_id
     - External ID is auto-generated with format: TRX-{location_id}-{timestamp}-{random}
+    - Price quota is validated before transaction creation
     """
     # Get webhook URL from settings (required by Xendit)
     webhook_url = getattr(settings, "XENDIT_WEBHOOK_URL", "")
@@ -113,7 +115,7 @@ async def get_transactions(
     - **page**: Page number (minimum 1)
     - **limit**: Items per page (1-100)
     - **search**: Search in external_id, xendit_id, or location name
-    - **sort_by**: Column to sort by (created_at, amount, status, paid_at, external_id)
+    - **sort_by**: Column to sort by (created_at, status, paid_at, external_id)
     - **sort_order**: Sort order (asc/desc)
     """
     return await transaction_service.get_transaction_list(

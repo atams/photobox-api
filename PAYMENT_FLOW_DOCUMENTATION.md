@@ -229,8 +229,7 @@ Body:
 {
   "external_id": "TRX-2-20251215092229-57283A15",
   "status": "COMPLETED",
-  "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84",
-  "paid_at": "2025-12-15T09:25:10.878Z"
+  "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
 }
 ```
 
@@ -407,8 +406,7 @@ GET /api/v1/transactions/external/TRX-2-20251215092229-57283A15
 {
   "external_id": "TRX-2-20251215092229-57283A15",
   "status": "COMPLETED",
-  "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84",
-  "paid_at": "2025-12-15T09:25:10.878Z"
+  "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
 }
 ```
 
@@ -692,8 +690,7 @@ curl -X POST http://localhost:8080/api/v1/webhooks/xendit \
   -d '{
     "external_id": "TRX-2-20251215092229-57283A15",
     "status": "COMPLETED",
-    "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84",
-    "paid_at": "2025-12-15T09:25:10.878Z"
+    "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
   }'
 ```
 

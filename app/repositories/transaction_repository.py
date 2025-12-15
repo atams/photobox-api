@@ -19,7 +19,7 @@ class TransactionRepository(BaseRepository[Transaction]):
 
     def get_by_external_id(self, db: Session, external_id: str) -> Optional[Transaction]:
         """
-        Get transaction by external ID with location relationship
+        Get transaction by external ID with location and price relationships
 
         Args:
             db: Database session
@@ -31,13 +31,14 @@ class TransactionRepository(BaseRepository[Transaction]):
         return (
             db.query(Transaction)
             .options(joinedload(Transaction.location))
+            .options(joinedload(Transaction.price))
             .filter(Transaction.tr_external_id == external_id)
             .first()
         )
 
     def get_by_id_with_location(self, db: Session, transaction_id: int) -> Optional[Transaction]:
         """
-        Get transaction by ID with location relationship
+        Get transaction by ID with location and price relationships
 
         Args:
             db: Database session
@@ -49,6 +50,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         return (
             db.query(Transaction)
             .options(joinedload(Transaction.location))
+            .options(joinedload(Transaction.price))
             .filter(Transaction.tr_id == transaction_id)
             .first()
         )
@@ -84,7 +86,10 @@ class TransactionRepository(BaseRepository[Transaction]):
         Returns:
             Tuple of (transactions list, total count)
         """
-        query = db.query(Transaction).options(joinedload(Transaction.location))
+        query = db.query(Transaction).options(
+            joinedload(Transaction.location),
+            joinedload(Transaction.price)
+        )
 
         # Filter by location IDs
         if location_ids:
@@ -120,7 +125,6 @@ class TransactionRepository(BaseRepository[Transaction]):
         # Sorting
         sort_column = {
             "created_at": Transaction.created_at,
-            "amount": Transaction.tr_amount,
             "status": Transaction.tr_status,
             "paid_at": Transaction.tr_paid_at,
             "external_id": Transaction.tr_external_id

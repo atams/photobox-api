@@ -31,3 +31,5 @@ Thumbs.db
 *.sqlite3
 
 docs/
+
+.claude/

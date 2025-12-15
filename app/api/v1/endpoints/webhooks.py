@@ -34,10 +34,10 @@ async def xendit_webhook(
     - **external_id**: External transaction ID
     - **status**: Transaction status (PENDING, COMPLETED, FAILED, EXPIRED)
     - **xendit_id**: Xendit transaction ID
-    - **paid_at**: Payment timestamp
 
     **Note:**
     - This endpoint is called by Xendit, not by users
+    - The `paid_at` timestamp is automatically set to the current time when status is COMPLETED
     - For testing, send header: x-callback-token with value from .env
     """
     # TASK B: Verify webhook authenticity using callback token

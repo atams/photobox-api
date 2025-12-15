@@ -18,7 +18,9 @@ from atams.logging import get_logger
 
 from app.repositories.transaction_repository import TransactionRepository
 from app.repositories.location_repository import LocationRepository
+from app.repositories.price_repository import PriceRepository
 from app.services.xendit_service import XenditService
+from app.services.price_service import PriceService
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionCreateResponse,
@@ -26,13 +28,13 @@ from app.schemas.transaction import (
     TransactionByExternalIdResponse,
     TransactionListItem,
     LocationInfo,
+    LocationDetail,
+    PriceInfo,
+    PriceDetail,
     XenditWebhookPayload
 )
 
 logger = get_logger(__name__)
-
-# Fixed amount for photobox transactions
-PHOTOBOX_AMOUNT = Decimal("40000.00")
 
 
 class TransactionService:
@@ -41,6 +43,8 @@ class TransactionService:
     def __init__(self, xendit_api_key: str):
         self.repository = TransactionRepository()
         self.location_repository = LocationRepository()
+        self.price_repository = PriceRepository()
+        self.price_service = PriceService()
         self.xendit_service = XenditService(api_key=xendit_api_key)
 
     def _generate_external_id(self, location_id: int) -> str:
@@ -75,7 +79,9 @@ class TransactionService:
             Transaction creation response
 
         Raises:
-            NotFoundException: If location not found or inactive
+            NotFoundException: If location or price not found
+            BadRequestException: If price is inactive
+            UnprocessableEntityException: If quota exceeded or location inactive
         """
         # Validate location exists and is active
         location = self.location_repository.get(db, data.location_id)
@@ -90,33 +96,57 @@ class TransactionService:
                 details={"location_id": data.location_id}
             )
 
+        # Validate price (exists, active, quota)
+        await self.price_service.validate_price_for_transaction(db, data.price_id)
+
+        # Get price to use for amount
+        price = self.price_repository.get_by_id(db, data.price_id)
+        amount = price.mp_price
+
         # Auto-generate external_id
         external_id = self._generate_external_id(data.location_id)
 
         # Generate QRIS from Xendit
         qris_data = await self.xendit_service.create_qris(
             external_id=external_id,
-            amount=PHOTOBOX_AMOUNT,
+            amount=amount,
             callback_url=webhook_url
         )
 
         # Create transaction in database
         transaction_data = {
             "tr_location_id": data.location_id,
+            "tr_price_id": data.price_id,
             "tr_external_id": external_id,
             "tr_xendit_id": qris_data.get("xendit_id"),
-            "tr_amount": PHOTOBOX_AMOUNT,
             "tr_status": "PENDING",
             "tr_qr_string": qris_data.get("qr_string")
         }
 
         transaction = self.repository.create(db, transaction_data)
-        logger.info(f"Transaction created: {transaction.tr_id} - {transaction.tr_external_id}")
+
+        # Refresh to load relationships
+        db.refresh(transaction)
+
+        logger.info(f"Transaction created: {transaction.tr_id} - {transaction.tr_external_id} - Amount: {amount}")
+
+        location_info = LocationInfo(
+            id=transaction.location.ml_id,
+            machine_code=transaction.location.ml_machine_code
+        )
+
+        price_info = PriceInfo(
+            id=transaction.price.mp_id,
+            price=transaction.price.mp_price
+        )
 
         return TransactionCreateResponse(
-            transaction_id=transaction.tr_id,
+            id=transaction.tr_id,
             external_id=transaction.tr_external_id,
-            amount=transaction.tr_amount,
+            location_id=transaction.tr_location_id,
+            location=location_info,
+            price_id=transaction.tr_price_id,
+            price=price_info,
             status=transaction.tr_status,
             qr_string=transaction.tr_qr_string,
             created_at=transaction.created_at
@@ -149,17 +179,25 @@ class TransactionService:
 
         location_info = LocationInfo(
             id=transaction.location.ml_id,
-            name=transaction.location.ml_name
+            machine_code=transaction.location.ml_machine_code
         ) if transaction.location else None
 
+        price_info = PriceInfo(
+            id=transaction.price.mp_id,
+            price=transaction.price.mp_price
+        ) if transaction.price else None
+
         return TransactionByExternalIdResponse(
-            transaction_id=transaction.tr_id,
+            id=transaction.tr_id,
             external_id=transaction.tr_external_id,
-            amount=transaction.tr_amount,
+            location_id=transaction.tr_location_id,
+            location=location_info,
+            price_id=transaction.tr_price_id,
+            price=price_info,
             status=transaction.tr_status,
-            qr_string=transaction.tr_qr_string,  # CRITICAL: Include QR string for frontend display
+            qr_string=transaction.tr_qr_string,
             paid_at=transaction.tr_paid_at,
-            location=location_info
+            created_at=transaction.created_at
         )
 
     async def get_transaction_detail(
@@ -168,14 +206,14 @@ class TransactionService:
         transaction_id: int
     ) -> TransactionDetailResponse:
         """
-        Get transaction detail by ID
+        Get transaction detail by ID with full details
 
         Args:
             db: Database session
             transaction_id: Transaction ID
 
         Returns:
-            Transaction detail response
+            Transaction detail response with full location and price details
 
         Raises:
             NotFoundException: If transaction not found
@@ -187,20 +225,48 @@ class TransactionService:
                 details={"transaction_id": transaction_id}
             )
 
-        location_info = LocationInfo(
+        # Map location detail
+        location_detail = LocationDetail(
             id=transaction.location.ml_id,
-            name=transaction.location.ml_name
+            machine_code=transaction.location.ml_machine_code,
+            name=transaction.location.ml_name,
+            address=transaction.location.ml_address,
+            is_active=transaction.location.ml_is_active,
+            created_at=transaction.location.created_at
         ) if transaction.location else None
+
+        # Map price detail with remaining quota calculation
+        price_detail = None
+        if transaction.price:
+            # Calculate remaining quota
+            remaining_quota = None
+            if transaction.price.mp_quota is not None:
+                used_quota = self.price_repository.count_transactions_by_price(db, transaction.price.mp_id)
+                remaining_quota = transaction.price.mp_quota - used_quota
+
+            price_detail = PriceDetail(
+                id=transaction.price.mp_id,
+                price=transaction.price.mp_price,
+                description=transaction.price.mp_description,
+                quota=transaction.price.mp_quota,
+                remaining_quota=remaining_quota,
+                is_active=transaction.price.mp_is_active,
+                created_at=transaction.price.created_at,
+                updated_at=transaction.price.updated_at
+            )
 
         return TransactionDetailResponse(
             id=transaction.tr_id,
             external_id=transaction.tr_external_id,
             xendit_id=transaction.tr_xendit_id,
-            amount=transaction.tr_amount,
+            location_id=transaction.tr_location_id,
+            location=location_detail,
+            price_id=transaction.tr_price_id,
+            price=price_detail,
             status=transaction.tr_status,
+            qr_string=transaction.tr_qr_string,
             paid_at=transaction.tr_paid_at,
-            created_at=transaction.created_at,
-            location=location_info
+            created_at=transaction.created_at
         )
 
     async def get_transaction_list(
@@ -272,17 +338,24 @@ class TransactionService:
         for txn in transactions:
             location_info = LocationInfo(
                 id=txn.location.ml_id,
-                name=txn.location.ml_name
+                machine_code=txn.location.ml_machine_code
             ) if txn.location else None
+
+            price_info = PriceInfo(
+                id=txn.price.mp_id,
+                price=txn.price.mp_price
+            ) if txn.price else None
 
             items.append(
                 TransactionListItem(
                     id=txn.tr_id,
                     external_id=txn.tr_external_id,
-                    amount=txn.tr_amount,
+                    location_id=txn.tr_location_id,
+                    location=location_info,
+                    price_id=txn.tr_price_id,
+                    price=price_info,
                     status=txn.tr_status,
-                    created_at=txn.created_at,
-                    location=location_info
+                    created_at=txn.created_at
                 )
             )
 
@@ -330,9 +403,9 @@ class TransactionService:
             "tr_xendit_id": payload.xendit_id,
         }
 
-        # Set paid_at timestamp if status is COMPLETED
+        # Set paid_at timestamp to now if status is COMPLETED
         if payload.status == "COMPLETED":
-            update_data["tr_paid_at"] = payload.paid_at
+            update_data["tr_paid_at"] = datetime.now()
 
         self.repository.update_by_external_id(db, payload.external_id, update_data)
         logger.info(f"Transaction updated via webhook: {payload.external_id} - {payload.status}")
