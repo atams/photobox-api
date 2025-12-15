@@ -19,8 +19,10 @@ class Settings(AtamsBaseSettings):
     APP_NAME: str = "photobox_api"
     APP_VERSION: str = "1.0.0"
 
-    # API Base URL (for generating gallery links in emails)
-    API_BASE_URL: str = "http://localhost:8000"  # Configure via .env for production
+    # Frontend Base URL (for generating gallery links in emails)
+    # IMPORTANT: Set this to FRONTEND URL, not backend API URL!
+    # Example production: https://photobox-frontend.com
+    API_BASE_URL: str = "http://localhost:3000"  # Configure via .env for production
 
     # Xendit Configuration
     XENDIT_API_KEY: str = ""  # Configure via .env file

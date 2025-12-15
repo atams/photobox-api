@@ -481,9 +481,10 @@ class TransactionService:
         # Upload photos to Cloudinary
         uploaded_photos = await self.cloudinary_service.upload_photos(external_id, files)
 
-        # Generate gallery URL (our own API endpoint for viewing photos)
+        # Generate gallery URL (frontend page)
+        # API_BASE_URL should be set to FRONTEND URL in production
         from app.core.config import settings
-        gallery_url = f"{settings.API_BASE_URL}/api/v1/gallery/{external_id}"
+        gallery_url = f"{settings.API_BASE_URL}/gallery/{external_id}"
 
         # Get price for email
         price = transaction.price
