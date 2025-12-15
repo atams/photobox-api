@@ -1,9 +1,9 @@
 """
 Location Repository - Database operations for locations
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy import or_
 
 from atams.db import BaseRepository
 from app.models.location import Location

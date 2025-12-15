@@ -41,11 +41,23 @@ class LocationListItem(BaseModel):
     id: int = Field(..., description="Location ID")
     machine_code: str = Field(..., description="Machine code")
     name: str = Field(..., description="Location name")
-    address: Optional[str] = Field(None, description="Address")
-    is_active: bool = Field(..., description="Active status")
 
     class Config:
         from_attributes = True
+
+
+class LocationListMeta(BaseModel):
+    """Schema for pagination metadata"""
+    page: int = Field(..., description="Current page number")
+    limit: int = Field(..., description="Items per page")
+    total_items: int = Field(..., description="Total number of items")
+    total_pages: int = Field(..., description="Total number of pages")
+
+
+class LocationListResponse(BaseModel):
+    """Schema for location list response"""
+    meta: LocationListMeta = Field(..., description="Pagination metadata")
+    data: list[LocationListItem] = Field(..., description="List of locations")
 
 
 class LocationUpdateResponse(BaseModel):

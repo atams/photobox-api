@@ -1,7 +1,7 @@
 """
 Location Service - Business logic for locations
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from math import ceil
 
@@ -113,9 +113,7 @@ class LocationService:
             LocationListItem(
                 id=loc.ml_id,
                 machine_code=loc.ml_machine_code,
-                name=loc.ml_name,
-                address=loc.ml_address,
-                is_active=loc.ml_is_active
+                name=loc.ml_name
             )
             for loc in locations
         ]

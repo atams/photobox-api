@@ -3,7 +3,7 @@ Transaction Repository - Database operations for transactions
 """
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, func, text
+from sqlalchemy import or_
 from datetime import date, timedelta
 
 from atams.db import BaseRepository

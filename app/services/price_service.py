@@ -1,7 +1,6 @@
 """
 Price Service - Business logic for prices
 """
-from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 from uuid import UUID

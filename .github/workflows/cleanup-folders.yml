@@ -1,0 +1,48 @@
+name: Cleanup Old Cloudinary Folders
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC+7 (17:00 UTC previous day)
+    - cron: '0 17 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Call Cleanup API
+        run: |
+          echo "Calling cleanup endpoint..."
+          response=$(curl -X DELETE "${{ secrets.API_BASE_URL }}/api/v1/maintenance/cleanup-old-folders" \
+            -H "X-Maintenance-Token: ${{ secrets.MAINTENANCE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -w "\nHTTP_CODE:%{http_code}" \
+            -s)
+
+          # Extract HTTP code
+          http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
+          body=$(echo "$response" | sed '/HTTP_CODE:/d')
+
+          # Display response
+          echo "Response Body:"
+          echo "$body" | jq '.' || echo "$body"
+
+          echo "HTTP Code: $http_code"
+
+          # Check if successful
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Cleanup completed successfully"
+            exit 0
+          else
+            echo "❌ Cleanup failed with HTTP code: $http_code"
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "⚠️ Cleanup job failed. Check the logs above for details."

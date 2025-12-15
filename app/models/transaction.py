@@ -1,7 +1,7 @@
 """
 Transaction Model - Transactions Table
 """
-from sqlalchemy import Column, BigInteger, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, BigInteger, String, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -26,6 +26,11 @@ class Transaction(Base):
     tr_xendit_id = Column(String(255), nullable=True)
     tr_status = Column(String(50), nullable=False, default="PENDING", index=True)
     tr_qr_string = Column(Text, nullable=True)
+
+    # Email & Photo Upload
+    tr_email = Column(String(255), nullable=True)
+    tr_send_invoice = Column(Boolean, nullable=False, default=False)
+    tr_email_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     # Audit Waktu
     tr_paid_at = Column(DateTime(timezone=True), nullable=True)

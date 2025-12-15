@@ -19,10 +19,32 @@ class Settings(AtamsBaseSettings):
     APP_NAME: str = "photobox_api"
     APP_VERSION: str = "1.0.0"
 
+    # API Base URL (for generating gallery links in emails)
+    API_BASE_URL: str = "http://localhost:8000"  # Configure via .env for production
+
     # Xendit Configuration
     XENDIT_API_KEY: str = ""  # Configure via .env file
     XENDIT_WEBHOOK_URL: str = ""  # Webhook URL for Xendit callbacks (optional for testing)
-    XENDIT_CALLBACK_TOKEN: str = ""  # TASK B: Callback verification token from Xendit dashboard
+    XENDIT_CALLBACK_TOKEN: str = ""  # Callback verification token from Xendit dashboard
+
+    # Cloudinary Configuration
+    CLOUDINARY_CLOUD_NAME: str = ""  # Cloudinary cloud name
+    CLOUDINARY_API_KEY: str = ""  # Cloudinary API key
+    CLOUDINARY_API_SECRET: str = ""  # Cloudinary API secret
+    CLOUDINARY_FOLDER: str = "photobox"  # Base folder for uploads
+
+    # Email Configuration
+    MAIL_USERNAME: str = ""  # SMTP username
+    MAIL_PASSWORD: str = ""  # SMTP password
+    MAIL_FROM: str = ""  # From email address
+    MAIL_FROM_NAME: str = "Photobox Service"  # From name
+    MAIL_SERVER: str = ""  # SMTP server
+    MAIL_PORT: int = 465  # SMTP port
+    MAIL_SSL_TLS: bool = True  # Use SSL/TLS
+    MAIL_STARTTLS: bool = False  # Use STARTTLS
+
+    # Maintenance Configuration
+    MAINTENANCE_TOKEN: str = ""  # Token for maintenance endpoints
 
 
 settings = Settings()

@@ -11,3 +11,9 @@ uvicorn[standard]>=0.24.0
 
 # Environment variables
 python-dotenv>=1.0.0
+
+# Photo Upload & Email (New Dependencies)
+cloudinary>=1.36.0          # Cloudinary photo storage
+jinja2>=3.1.2              # Email template rendering
+python-multipart>=0.0.6    # File upload support
+httpx>=0.24.0              # Already included in ATAMS, but explicitly listed for Xendit

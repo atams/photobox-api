@@ -1,8 +1,8 @@
 """
 Transaction Schemas - DTOs for Transaction API
 """
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -13,6 +13,8 @@ class TransactionCreate(BaseModel):
     """Schema for creating a transaction"""
     location_id: int = Field(..., description="Location ID where QR is generated")
     price_id: UUID = Field(..., description="Price ID to use for this transaction")
+    email: EmailStr = Field(..., description="User email for photo delivery")
+    send_invoice: bool = Field(default=False, description="Whether to include invoice in email")
 
 
 # Response Schemas
@@ -139,3 +141,28 @@ class XenditWebhookPayload(BaseModel):
 class WebhookResponse(BaseModel):
     """Schema for webhook response"""
     message: str = Field(default="Transaction updated")
+
+
+# Photo Upload Schemas
+class PhotoUploadInfo(BaseModel):
+    """Schema for individual photo upload info"""
+    filename: str = Field(..., description="Original filename")
+    url: str = Field(..., description="Cloudinary public URL")
+    size: int = Field(..., description="File size in bytes")
+
+
+class PhotoUploadResponse(BaseModel):
+    """Schema for photo upload response"""
+    uploaded_count: int = Field(..., description="Number of photos uploaded")
+    folder_url: str = Field(..., description="Cloudinary folder URL for all photos")
+    email_sent: bool = Field(..., description="Whether email was sent successfully")
+    email_sent_at: Optional[datetime] = Field(None, description="Email sent timestamp")
+    photos: List[PhotoUploadInfo] = Field(..., description="List of uploaded photos")
+
+
+# Cleanup Schemas
+class CleanupResponse(BaseModel):
+    """Schema for cleanup maintenance response"""
+    deleted_count: int = Field(..., description="Number of folders deleted")
+    folders: List[str] = Field(..., description="List of deleted folder names (external_ids)")
+    message: str = Field(..., description="Status message")

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photobox - Gallery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -1px;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .transaction-info {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 24px 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .transaction-info .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .transaction-info .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-info .label {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .transaction-info .value {
+            color: #111827;
+            font-weight: 600;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .photo-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .photo-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .photo-card img {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .photo-card .actions {
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .photo-card .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-view {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-view:hover {
+            opacity: 0.9;
+        }
+
+        .btn-download {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-download:hover {
+            background: #e5e7eb;
+        }
+
+        .download-all {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .download-all .btn {
+            display: inline-block;
+            padding: 16px 48px;
+            background: white;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        .download-all .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .warning-box {
+            background: rgba(254, 243, 199, 0.95);
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .warning-box .title {
+            color: #92400e;
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .warning-box .text {
+            color: #78350f;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            font-size: 14px;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 36px;
+            }
+
+            .gallery {
+                grid-template-columns: 1fr;
+            }
+
+            .transaction-info {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📸 Photobox Gallery</h1>
+            <p>Foto-foto Anda Sudah Siap!</p>
+        </div>
+
+        <!-- Transaction Info -->
+        <div class="transaction-info">
+            <div class="info-row">
+                <span class="label">Transaction ID</span>
+                <span class="value">{{ external_id }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Jumlah Foto</span>
+                <span class="value">{{ photo_count }} foto</span>
+            </div>
+            {% if expiry_date %}
+            <div class="info-row">
+                <span class="label">Kadaluarsa</span>
+                <span class="value">{{ expiry_date }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Warning Box -->
+        <div class="warning-box">
+            <div class="title">⚠️ PENTING - Batas Waktu Download</div>
+            <div class="text">
+                Link download akan <strong>kadaluarsa pada {{ expiry_date }}</strong> (14 hari dari sekarang).
+                Harap download semua foto sebelum tanggal tersebut untuk menghindari kehilangan file.
+            </div>
+        </div>
+
+        <!-- Download All Button -->
+        <div class="download-all">
+            <a href="#" onclick="downloadAll(); return false;" class="btn">
+                📥 Download Semua Foto (ZIP)
+            </a>
+        </div>
+
+        <!-- Photo Gallery -->
+        <div class="gallery">
+            {% for photo in photos %}
+            <div class="photo-card">
+                <img src="{{ photo.thumbnail_url }}" alt="Photo {{ loop.index }}" loading="lazy">
+                <div class="actions">
+                    <a href="{{ photo.url }}" target="_blank" class="btn btn-view">👁️ Lihat</a>
+                    <a href="{{ photo.url }}" download="photo_{{ loop.index }}.jpg" class="btn btn-download">⬇️ Download</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            © 2025 Photobox. All rights reserved.
+        </div>
+    </div>
+
+    <script>
+        function downloadAll() {
+            // Download each photo sequentially
+            const photos = {{ photos | tojson }};
+            let delay = 0;
+
+            photos.forEach((photo, index) => {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = photo.url;
+                    link.download = `photo_${index + 1}.jpg`;
+                    link.click();
+                }, delay);
+                delay += 500; // 500ms delay between each download
+            });
+
+            alert('Download dimulai! Mohon tunggu semua foto selesai diunduh.');
+        }
+    </script>
+</body>
+</html>

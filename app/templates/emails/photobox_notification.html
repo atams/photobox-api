@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photobox - Foto Anda Sudah Siap</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f7f9fc;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f9fc; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <!-- Main Container -->
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden;">
+
+                    <!-- Header with Gradient -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">
+                                📸 Photobox
+                            </h1>
+                            <p style="margin: 12px 0 0 0; color: #e0e7ff; font-size: 16px; font-weight: 400;">
+                                Foto Anda Sudah Siap!
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                Hai! 👋
+                            </p>
+                            <p style="margin: 0 0 32px 0; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                Terima kasih telah menggunakan layanan Photobox. Foto-foto Anda sudah siap untuk diunduh!
+                            </p>
+
+                            {% if send_invoice %}
+                            <!-- Invoice Section -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid #e5e7eb;">
+                                <tr>
+                                    <td>
+                                        <h2 style="margin: 0 0 20px 0; color: #111827; font-size: 18px; font-weight: 600; display: flex; align-items: center;">
+                                            <span style="font-size: 20px; margin-right: 8px;">📄</span> Invoice Pembayaran
+                                        </h2>
+
+                                        <table width="100%" cellpadding="8" cellspacing="0">
+                                            <tr>
+                                                <td width="40%" style="color: #6b7280; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    Transaction ID
+                                                </td>
+                                                <td style="color: #111827; font-size: 14px; font-weight: 500; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    {{ transaction_id }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #6b7280; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    Jumlah
+                                                </td>
+                                                <td style="color: #111827; font-size: 18px; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    Rp {{ "{:,.0f}".format(amount) }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #6b7280; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    Status
+                                                </td>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    <span style="display: inline-block; background-color: #10b981; color: #ffffff; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                                                        ✓ LUNAS
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #6b7280; font-size: 14px; padding: 8px 0;">
+                                                    Tanggal Bayar
+                                                </td>
+                                                <td style="color: #111827; font-size: 14px; font-weight: 500; padding: 8px 0;">
+                                                    {{ paid_at }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+
+                            <!-- Photos Section -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px;">
+                                <tr>
+                                    <td align="center">
+                                        <h2 style="margin: 0 0 16px 0; color: #ffffff; font-size: 22px; font-weight: 700;">
+                                            📥 Download Foto Anda
+                                        </h2>
+                                        <p style="margin: 0 0 24px 0; color: #e0e7ff; font-size: 15px; line-height: 1.5;">
+                                            Klik tombol di bawah untuk mengakses semua foto Anda
+                                        </p>
+                                        <a href="{{ folder_url }}" style="display: inline-block; background-color: #ffffff; color: #667eea; padding: 16px 48px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                            Download Semua Foto
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Warning Box -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin-bottom: 32px;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0 0 12px 0; color: #92400e; font-size: 15px; font-weight: 700;">
+                                            ⚠️ PENTING - Batas Waktu Download
+                                        </p>
+                                        <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+                                            Link download akan <strong>kadaluarsa pada {{ expiry_date }}</strong> (14 hari dari sekarang).
+                                            Harap download semua foto sebelum tanggal tersebut untuk menghindari kehilangan file.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Tips Box -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #e0f2fe; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0 0 12px 0; color: #075985; font-size: 15px; font-weight: 700;">
+                                            💡 Tips
+                                        </p>
+                                        <ul style="margin: 0; padding-left: 20px; color: #0c4a6e; font-size: 14px; line-height: 1.8;">
+                                            <li>Simpan foto di perangkat Anda atau cloud storage</li>
+                                            <li>Klik kanan pada foto dan pilih "Save Image As"</li>
+                                            <li>Pastikan koneksi internet stabil saat download</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 32px 30px; border-top: 1px solid #e5e7eb; text-align: center;">
+                            <p style="margin: 0 0 8px 0; color: #111827; font-size: 16px; font-weight: 600;">
+                                Terima kasih sudah menggunakan Photobox! 🎉
+                            </p>
+                            <p style="margin: 0; color: #6b7280; font-size: 13px; line-height: 1.6;">
+                                Email ini dikirim secara otomatis. Mohon tidak membalas email ini.<br>
+                                Jika ada pertanyaan, silakan hubungi customer service kami.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+
+                <!-- Bottom Spacer -->
+                <table width="600" cellpadding="0" cellspacing="0" style="margin-top: 24px;">
+                    <tr>
+                        <td align="center" style="color: #9ca3af; font-size: 12px; line-height: 1.5;">
+                            © 2025 Photobox. All rights reserved.
+                        </td>
+                    </tr>
+                </table>
+
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -11,7 +11,8 @@ from app.schemas.location import (
     LocationCreate,
     LocationUpdate,
     LocationResponse,
-    LocationUpdateResponse
+    LocationUpdateResponse,
+    LocationListResponse
 )
 
 router = APIRouter()
@@ -34,7 +35,7 @@ async def create_location(
     return await location_service.create_location(db, data)
 
 
-@router.get("", status_code=status.HTTP_200_OK)
+@router.get("", response_model=LocationListResponse, status_code=status.HTTP_200_OK)
 async def get_locations(
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number (minimum 1)"),

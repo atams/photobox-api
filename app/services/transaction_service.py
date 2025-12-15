@@ -4,15 +4,16 @@ Transaction Service - Business logic for transactions
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from math import ceil
 import secrets
+from fastapi import UploadFile
 
 from atams.exceptions import (
     NotFoundException,
     ConflictException,
     BadRequestException,
-    UnprocessableEntityException
+    UnprocessableEntityException,
+    InternalServerException
 )
 from atams.logging import get_logger
 
@@ -21,6 +22,8 @@ from app.repositories.location_repository import LocationRepository
 from app.repositories.price_repository import PriceRepository
 from app.services.xendit_service import XenditService
 from app.services.price_service import PriceService
+from app.services.cloudinary_service import CloudinaryService
+from app.services.email_service import EmailService
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionCreateResponse,
@@ -31,7 +34,8 @@ from app.schemas.transaction import (
     LocationDetail,
     PriceInfo,
     PriceDetail,
-    XenditWebhookPayload
+    XenditWebhookPayload,
+    PhotoUploadInfo
 )
 
 logger = get_logger(__name__)
@@ -40,12 +44,19 @@ logger = get_logger(__name__)
 class TransactionService:
     """Service for transaction business logic"""
 
-    def __init__(self, xendit_api_key: str):
+    def __init__(
+        self,
+        xendit_api_key: str,
+        cloudinary_service: Optional[CloudinaryService] = None,
+        email_service: Optional[EmailService] = None
+    ):
         self.repository = TransactionRepository()
         self.location_repository = LocationRepository()
         self.price_repository = PriceRepository()
         self.price_service = PriceService()
         self.xendit_service = XenditService(api_key=xendit_api_key)
+        self.cloudinary_service = cloudinary_service
+        self.email_service = email_service
 
     def _generate_external_id(self, location_id: int) -> str:
         """
@@ -120,7 +131,9 @@ class TransactionService:
             "tr_external_id": external_id,
             "tr_xendit_id": qris_data.get("xendit_id"),
             "tr_status": "PENDING",
-            "tr_qr_string": qris_data.get("qr_string")
+            "tr_qr_string": qris_data.get("qr_string"),
+            "tr_email": data.email,
+            "tr_send_invoice": data.send_invoice
         }
 
         transaction = self.repository.create(db, transaction_data)
@@ -411,3 +424,153 @@ class TransactionService:
         logger.info(f"Transaction updated via webhook: {payload.external_id} - {payload.status}")
 
         return {"message": "Transaction updated"}
+
+    async def upload_photos(
+        self,
+        db: Session,
+        external_id: str,
+        files: List[UploadFile]
+    ) -> Dict[str, Any]:
+        """
+        Upload photos to Cloudinary and send email notification
+
+        Args:
+            db: Database session
+            external_id: Transaction external ID
+            files: List of photo files to upload
+
+        Returns:
+            Dictionary with upload results and email status
+
+        Raises:
+            NotFoundException: If transaction not found
+            UnprocessableEntityException: If transaction not completed or email already sent
+            BadRequestException: If file validation fails
+        """
+        # Validate transaction exists
+        transaction = self.repository.get_by_external_id(db, external_id)
+        if not transaction:
+            raise NotFoundException(
+                "Transaction not found",
+                details={"external_id": external_id}
+            )
+
+        # Validate transaction status is COMPLETED
+        if transaction.tr_status != "COMPLETED":
+            raise UnprocessableEntityException(
+                "Transaction payment not completed yet",
+                details={"external_id": external_id, "status": transaction.tr_status}
+            )
+
+        # Validate email not sent yet
+        if transaction.tr_email_sent_at is not None:
+            raise ConflictException(
+                "Photos already uploaded and email sent for this transaction",
+                details={
+                    "external_id": external_id,
+                    "email_sent_at": transaction.tr_email_sent_at.isoformat() if transaction.tr_email_sent_at else None
+                }
+            )
+
+        # Validate services are available
+        if not self.cloudinary_service:
+            raise InternalServerException("Cloudinary service not configured")
+        if not self.email_service:
+            raise InternalServerException("Email service not configured")
+
+        # Upload photos to Cloudinary
+        uploaded_photos = await self.cloudinary_service.upload_photos(external_id, files)
+
+        # Generate gallery URL (our own API endpoint for viewing photos)
+        from app.core.config import settings
+        gallery_url = f"{settings.API_BASE_URL}/api/v1/gallery/{external_id}"
+
+        # Get price for email
+        price = transaction.price
+
+        # Send email notification
+        try:
+            email_sent = self.email_service.send_photobox_notification(
+                to_email=transaction.tr_email,
+                external_id=external_id,
+                folder_url=gallery_url,
+                amount=price.mp_price if price else None,
+                paid_at=transaction.tr_paid_at,
+                send_invoice=transaction.tr_send_invoice
+            )
+
+            # Update email_sent_at timestamp
+            if email_sent:
+                update_data = {"tr_email_sent_at": datetime.now()}
+                self.repository.update_by_external_id(db, external_id, update_data)
+                logger.info(f"Email sent successfully for transaction {external_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to send email for transaction {external_id}: {str(e)}")
+            # Don't fail the entire upload if email fails
+            email_sent = False
+
+        # Prepare response
+        photo_info_list = [
+            PhotoUploadInfo(
+                filename=photo["filename"],
+                url=photo["url"],
+                size=photo["size"]
+            )
+            for photo in uploaded_photos
+        ]
+
+        return {
+            "uploaded_count": len(uploaded_photos),
+            "folder_url": gallery_url,
+            "email_sent": email_sent,
+            "email_sent_at": transaction.tr_email_sent_at if email_sent else None,
+            "photos": photo_info_list
+        }
+
+    async def cleanup_old_folders(self, db: Session, days: int = 14) -> Dict[str, Any]:
+        """
+        Clean up Cloudinary folders older than specified days
+
+        Args:
+            db: Database session
+            days: Number of days (default: 14)
+
+        Returns:
+            Dictionary with cleanup results
+
+        Raises:
+            InternalServerException: If Cloudinary service not configured
+        """
+        if not self.cloudinary_service:
+            raise InternalServerException("Cloudinary service not configured")
+
+        # Calculate cutoff date
+        cutoff_date = datetime.now() - timedelta(days=days)
+
+        # Get transactions with email sent before cutoff date
+        transactions = db.query(self.repository.model).filter(
+            self.repository.model.tr_email_sent_at < cutoff_date,
+            self.repository.model.tr_email_sent_at.isnot(None)
+        ).all()
+
+        deleted_folders = []
+        failed_folders = []
+
+        for transaction in transactions:
+            try:
+                # Delete folder from Cloudinary
+                self.cloudinary_service.delete_folder(transaction.tr_external_id)
+                deleted_folders.append(transaction.tr_external_id)
+                logger.info(f"Deleted folder for transaction {transaction.tr_external_id}")
+            except Exception as e:
+                logger.error(f"Failed to delete folder for {transaction.tr_external_id}: {str(e)}")
+                failed_folders.append(transaction.tr_external_id)
+
+        return {
+            "deleted_count": len(deleted_folders),
+            "folders": deleted_folders,
+            "failed_count": len(failed_folders),
+            "failed_folders": failed_folders,
+            "message": f"{len(deleted_folders)} folders deleted successfully"
+        }
