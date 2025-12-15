@@ -58,14 +58,17 @@ class PriceRepository(BaseRepository[Price]):
 
     def count_transactions_by_price(self, db: Session, price_id: UUID) -> int:
         """
-        Count transactions using this price
+        Count transactions using this price with status COMPLETED or PENDING
 
         Args:
             db: Database session
             price_id: Price UUID
 
         Returns:
-            Number of transactions
+            Number of transactions with status COMPLETED or PENDING
         """
         from app.models.transaction import Transaction
-        return db.query(Transaction).filter(Transaction.tr_price_id == price_id).count()
+        return db.query(Transaction).filter(
+            Transaction.tr_price_id == price_id,
+            Transaction.tr_status.in_(["COMPLETED", "PENDING"])
+        ).count()
