@@ -23,10 +23,13 @@ A FastAPI-based QRIS payment system for photobox kiosks, built with the ATAMS to
 -   **QRIS Payment Integration**: Seamless integration with Xendit for QRIS payment generation and processing
 -   **Polling-Based Status Updates**: Real-time payment status tracking via 3-second polling mechanism
 -   **Location Management**: Master data management for photobox machine locations
+-   **Price Management with Quota System**: Flexible pricing with quota tracking and validation
+-   **Photo Upload to Cloudinary**: Automatic photo storage and management with 14-day expiration
+-   **Email Notifications**: Automated email delivery with photo gallery links and optional invoice
 -   **Webhook Processing**: Secure webhook endpoint for payment status notifications from Xendit
 -   **Atlas SSO Integration**: Enterprise-grade authentication via ATAMS toolkit
 -   **Auto-Generated Transaction IDs**: Unique external ID generation with location and timestamp
--   **15-Minute QRIS Expiration**: Automatic expiration handling for payment codes
+-   **Response Encryption**: Optional AES-256-CBC encryption for sensitive API responses
 
 ## Technology Stack
 
@@ -35,6 +38,9 @@ A FastAPI-based QRIS payment system for photobox kiosks, built with the ATAMS to
 -   **ORM**: SQLAlchemy
 -   **Authentication**: Atlas SSO (ATAMS)
 -   **Payment Gateway**: Xendit (QRIS)
+-   **Photo Storage**: Cloudinary
+-   **Email**: SMTP (configurable)
+-   **Encryption**: AES-256-CBC (cryptography)
 -   **Validation**: Pydantic
 -   **Server**: Uvicorn
 -   **Toolkit**: ATAMS (Atlas Toolkit for API Management System)
@@ -45,6 +51,8 @@ A FastAPI-based QRIS payment system for photobox kiosks, built with the ATAMS to
 -   PostgreSQL database
 -   Xendit account with API access
 -   Atlas SSO credentials (for authentication)
+-   Cloudinary account (for photo storage)
+-   SMTP server credentials (for email notifications)
 
 ## Installation
 
@@ -100,7 +108,7 @@ DB_POOL_PRE_PING=true
 
 # Atlas SSO Configuration
 ATLAS_SSO_URL=https://atlas.yourdomain.com/api/v1
-ATLAS_APP_CODE=PHOTOBOX
+ATLAS_APP_CODE=PHOTOBOX_API
 ATLAS_ENCRYPTION_KEY=[32-char-key]
 ATLAS_ENCRYPTION_IV=[16-char-iv]
 
@@ -108,6 +116,25 @@ ATLAS_ENCRYPTION_IV=[16-char-iv]
 XENDIT_API_KEY=xnd_development_...
 XENDIT_WEBHOOK_URL=https://your-domain.com/api/v1/webhooks/xendit
 XENDIT_CALLBACK_TOKEN=your_callback_token_here
+
+# Cloudinary Configuration
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_FOLDER=photobox
+
+# Email Configuration
+MAIL_USERNAME=noreply@yourdomain.com
+MAIL_PASSWORD=your_smtp_password
+MAIL_FROM=noreply@yourdomain.com
+MAIL_FROM_NAME=Photobox Service
+MAIL_SERVER=smtp.yourdomain.com
+MAIL_PORT=465
+MAIL_SSL_TLS=true
+MAIL_STARTTLS=false
+
+# Frontend URL (for gallery links in emails)
+API_BASE_URL=http://localhost:3000
 
 # Response Encryption (Optional)
 ENCRYPTION_ENABLED=false
@@ -117,21 +144,25 @@ ENCRYPTION_IV=[16-char-hex]   # Generate: openssl rand -hex 8
 # CORS Configuration
 CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
 CORS_ALLOW_CREDENTIALS=true
-CORS_ALLOW_METHODS=*
+CORS_ALLOW_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
 CORS_ALLOW_HEADERS=*
+
+# Maintenance Token (for cleanup endpoint)
+MAINTENANCE_TOKEN=your_secure_token
 
 # Logging
 LOGGING_ENABLED=true
 LOG_LEVEL=INFO
 LOG_TO_FILE=false
-LOG_FILE_PATH=logs/app.log
 ```
 
 **Important Notes:**
 
 -   `XENDIT_WEBHOOK_URL` must be publicly accessible and configured in both `.env` AND Xendit dashboard
+-   `API_BASE_URL` should point to your FRONTEND URL (where gallery page is hosted), not the API URL
 -   For Aiven free tier (20 connection limit), keep default pool settings
 -   Total connections = `(DB_POOL_SIZE + DB_MAX_OVERFLOW) × app_instances`
+-   Generate secure encryption keys: `openssl rand -hex 16` (32 chars) and `openssl rand -hex 8` (16 chars)
 
 ## Running the Application
 
@@ -165,13 +196,16 @@ Base URL: `/api/v1`
 
 Create a new transaction and generate QRIS payment code.
 
-**Authorization:** Required (Atlas SSO)
+**Authorization:** Not required (public endpoint)
 
 **Request Body:**
 
 ```json
 {
-    "location_id": 2
+    "location_id": 2,
+    "price_id": "uuid-here",
+    "email": "customer@example.com",
+    "send_invoice": true
 }
 ```
 
@@ -182,22 +216,29 @@ Create a new transaction and generate QRIS payment code.
     "success": true,
     "message": "Transaction created successfully",
     "data": {
-        "tr_id": 1,
-        "tr_external_id": "TRX-2-20251215092229-57283A15",
-        "tr_location_id": 2,
-        "tr_amount": 40000,
-        "tr_status": "PENDING",
-        "tr_qris_string": "00020101021226...",
-        "tr_qris_url": "https://d.xnd.io/...",
-        "tr_expired_at": "2025-12-15T09:37:29",
-        "tr_created_at": "2025-12-15T09:22:29"
+        "id": 1,
+        "external_id": "TRX-2-20251215092229-57283A15",
+        "location_id": 2,
+        "location": {
+            "id": 2,
+            "machine_code": "PB-001"
+        },
+        "price_id": "uuid-here",
+        "price": {
+            "id": "uuid-here",
+            "price": 40000
+        },
+        "status": "PENDING",
+        "qr_string": "00020101021226...",
+        "created_at": "2025-12-15T09:22:29"
     }
 }
 ```
 
 **Business Logic:**
 
--   Amount is fixed at Rp 40,000 (`PHOTOBOX_AMOUNT` constant)
+-   Amount is determined by the `price_id` (flexible pricing)
+-   Price quota is validated before transaction creation
 -   External ID format: `TRX-{location_id}-{timestamp}-{random}`
 -   QRIS expires in exactly 15 minutes
 -   Initial status is `PENDING`
@@ -215,11 +256,22 @@ Get transaction status by external ID (for polling).
     "success": true,
     "message": "Transaction retrieved successfully",
     "data": {
-        "tr_id": 1,
-        "tr_external_id": "TRX-2-20251215092229-57283A15",
-        "tr_status": "COMPLETED",
-        "tr_paid_at": "2025-12-15T09:25:30",
-        "tr_amount": 40000
+        "id": 1,
+        "external_id": "TRX-2-20251215092229-57283A15",
+        "location_id": 2,
+        "location": {
+            "id": 2,
+            "machine_code": "PB-001"
+        },
+        "price_id": "uuid-here",
+        "price": {
+            "id": "uuid-here",
+            "price": 40000
+        },
+        "status": "COMPLETED",
+        "qr_string": "00020101021226...",
+        "paid_at": "2025-12-15T09:25:30",
+        "created_at": "2025-12-15T09:22:29"
     }
 }
 ```
@@ -274,62 +326,91 @@ Get all photos for a transaction (for frontend gallery).
 -   Photos expire 14 days after email sent
 -   Returns 404 if transaction not found or no photos uploaded
 
-#### GET /api/v1/transactions/count
+#### POST /api/v1/transactions/{external_id}/photos
 
-Get total count of transactions by status.
+Upload photos for a completed transaction.
 
-**Authorization:** Required (Atlas SSO)
+**Authorization:** Not required (public endpoint)
 
-**Query Parameters:**
+**Request:** Multipart form data with photo files
 
--   `status`: Filter by status (optional, comma-separated: "COMPLETED,PENDING")
+**Requirements:**
+-   Transaction must exist and status must be COMPLETED
+-   Email must not have been sent yet
+-   Each file must be JPG/JPEG/PNG format
+-   Each file must be ≤ 10MB
 
 **Response:**
 
 ```json
 {
-    "success": true,
-    "message": "Transaction count retrieved successfully",
-    "data": {
-        "count": 42
-    }
+    "uploaded_count": 12,
+    "folder_url": "http://localhost:3000/gallery/TRX-2-20251215092229-57283A15",
+    "email_sent": true,
+    "email_sent_at": "2025-12-15T10:00:00",
+    "photos": [
+        {
+            "filename": "photo1.jpg",
+            "url": "https://res.cloudinary.com/...",
+            "size": 1024000
+        }
+    ]
 }
 ```
+
+**Process:**
+1. Validates transaction and files
+2. Uploads photos to Cloudinary folder: `photobox/{external_id}/`
+3. Sends email with gallery link and optional invoice
+4. Updates `tr_email_sent_at` timestamp
+5. Photos expire after 14 days
 
 #### GET /api/v1/transactions (List)
 
 List all transactions with pagination and filtering.
 
-**Authorization:** Required (Atlas SSO)
+**Authorization:** Required (Atlas SSO, Admin only)
 
 **Query Parameters:**
 
--   `search`: Filter by external ID or location name (optional)
--   `skip`: Offset pagination (default: 0)
--   `limit`: Records per page (1-1000, default: 100)
+-   `location_ids`: Filter by location IDs (optional, array)
+-   `status`: Filter by status values (optional, array: PENDING, COMPLETED, FAILED, EXPIRED)
+-   `date_from`: Start date (optional, format: YYYY-MM-DD)
+-   `date_to`: End date (optional, format: YYYY-MM-DD)
+-   `page`: Page number (default: 1)
+-   `limit`: Records per page (1-100, default: 10)
+-   `search`: Search in external_id, xendit_id, or location name (optional)
+-   `sort_by`: Column to sort by (default: created_at)
+-   `sort_order`: Sort order (asc/desc, default: desc)
 
 **Response:**
 
 ```json
 {
-    "success": true,
-    "message": "Transactions retrieved successfully",
+    "meta": {
+        "page": 1,
+        "limit": 10,
+        "total_items": 100,
+        "total_pages": 10
+    },
     "data": [
         {
-            "tr_id": 1,
-            "tr_external_id": "TRX-2-20251215092229-57283A15",
-            "tr_status": "COMPLETED",
-            "tr_amount": 40000,
+            "id": 1,
+            "external_id": "TRX-2-20251215092229-57283A15",
+            "location_id": 2,
             "location": {
-                "ml_id": 2,
-                "ml_name": "Mall Kelapa Gading"
-            }
+                "id": 2,
+                "machine_code": "PB-001"
+            },
+            "price_id": "uuid-here",
+            "price": {
+                "id": "uuid-here",
+                "price": 40000
+            },
+            "status": "COMPLETED",
+            "created_at": "2025-12-15T09:22:29"
         }
-    ],
-    "total": 100,
-    "page": 1,
-    "size": 100,
-    "pages": 1
+    ]
 }
 ```
 
@@ -384,14 +465,16 @@ Get single location by ID.
 
 Create new location.
 
-**Authorization:** Required (Atlas SSO, Admin level)
+**Authorization:** Required (Atlas SSO, Admin only)
 
 **Request Body:**
 
 ```json
 {
-    "ml_name": "Mall Senayan City",
-    "ml_address": "Jl. Asia Afrika No. 8"
+    "machine_code": "PB-001",
+    "name": "Mall Senayan City",
+    "address": "Jl. Asia Afrika No. 8",
+    "is_active": true
 }
 ```
 
@@ -399,13 +482,13 @@ Create new location.
 
 Update existing location.
 
-**Authorization:** Required (Atlas SSO, Admin level)
+**Authorization:** Required (Atlas SSO, Admin only)
 
 #### DELETE /api/v1/locations/{id}
 
 Delete location.
 
-**Authorization:** Required (Atlas SSO, Admin level)
+**Authorization:** Required (Atlas SSO, Admin only)
 
 ---
 
@@ -468,7 +551,50 @@ Update existing price.
 
 Delete price.
 
-**Authorization:** Required (Atlas SSO, Admin level)
+**Authorization:** Required (Atlas SSO, Admin only)
+
+---
+
+### Maintenance
+
+#### POST /api/v1/maintenance/cleanup
+
+Clean up Cloudinary folders older than specified days.
+
+**Authorization:** Required (Maintenance Token in header: `X-Maintenance-Token`)
+
+**Query Parameters:**
+
+-   `days`: Number of days (default: 14)
+
+**Response:**
+
+```json
+{
+    "deleted_count": 5,
+    "folders": ["TRX-2-20251201...", "TRX-3-20251202..."],
+    "failed_count": 0,
+    "failed_folders": [],
+    "message": "5 folders deleted successfully"
+}
+```
+
+**Process:**
+1. Finds transactions with `email_sent_at` older than specified days
+2. Deletes corresponding Cloudinary folders
+3. Returns summary of deleted and failed folders
+
+---
+
+### Gallery
+
+#### GET /gallery/{external_id}
+
+Display photo gallery page (HTML template).
+
+**Authorization:** Not required (public page)
+
+**Note:** This is a template endpoint that renders an HTML page for displaying transaction photos. The frontend should implement this page to fetch photos from `/api/v1/transactions/{external_id}/photos`.
 
 ## Architecture
 
@@ -481,31 +607,40 @@ Delete price.
 1. **master_locations** - Photobox machine locations
 
     - `ml_id` (PK): Location ID
+    - `ml_machine_code` (Unique): Machine code identifier
     - `ml_name`: Location name
     - `ml_address`: Physical address
-    - `ml_created_at`: Creation timestamp
-    - **Constraints**: Unique location names
+    - `ml_is_active`: Active status flag
+    - `created_at`: Creation timestamp
+    - **Indexes**: `ml_id`, `ml_machine_code`
 
-2. **transactions** - Payment transactions
+2. **master_price** - Price configurations
+
+    - `mp_id` (PK, UUID): Price ID
+    - `mp_price`: Price amount (Numeric 15,2)
+    - `mp_description`: Price description
+    - `mp_quota`: Available quota (NULL = unlimited)
+    - `mp_is_active`: Active status flag
+    - `created_at`: Creation timestamp
+    - `updated_at`: Last update timestamp
+    - **Business Logic**: Quota is validated before transaction creation
+
+3. **transactions** - Payment transactions
 
     - `tr_id` (PK): Transaction ID
     - `tr_external_id` (Unique): External transaction identifier
-    - `tr_location_id` (FK): References master_locations
-    - `tr_amount`: Payment amount (Rp 40,000 fixed)
-    - `tr_status`: Status (PENDING/COMPLETED/FAILED/EXPIRED)
-    - `tr_qris_string`: Full QRIS payload for QR generation
-    - `tr_qris_url`: Xendit QRIS URL
+    - `tr_location_id` (FK): References master_locations.ml_id
+    - `tr_price_id` (FK, UUID): References master_price.mp_id
     - `tr_xendit_id`: Xendit payment identifier
-    - `tr_expired_at`: QRIS expiration timestamp (15 minutes)
+    - `tr_status`: Status (PENDING/COMPLETED/FAILED/EXPIRED)
+    - `tr_qr_string`: Full QRIS payload for QR generation
+    - `tr_email`: Customer email address
+    - `tr_send_invoice`: Invoice flag
+    - `tr_email_sent_at`: Email sent timestamp
     - `tr_paid_at`: Payment completion timestamp
-    - `tr_created_at`: Creation timestamp
-    - **Indexes**: `tr_external_id`, `tr_status`, `tr_created_at`
-
-3. **master_prices** - Price configurations
-    - `mp_id` (PK): Price ID
-    - `mp_name`: Price name/description
-    - `mp_amount`: Price amount
-    - `mp_created_at`: Creation timestamp
+    - `created_at`: Creation timestamp
+    - **Indexes**: `tr_id`, `tr_external_id`, `tr_status`, `tr_price_id`, `created_at`
+    - **Business Logic**: Photos expire 14 days after `tr_email_sent_at`
 
 ### Layered Architecture (ATAMS Pattern)
 
@@ -603,8 +738,7 @@ Status transitions are one-way only. Terminal states are final.
 
 **Authorization Levels:**
 
--   **Level 1** (>= 1): Regular users (read access)
--   **Level 50** (>= 50): Administrators (full CRUD)
+-   **Admin** (`role_level <= 10`): Full access to all admin endpoints
 
 **Usage in Endpoints:**
 
@@ -614,14 +748,25 @@ from app.api.deps import require_auth, require_min_role_level
 # Basic auth
 @router.get("/endpoint", dependencies=[Depends(require_auth)])
 
-# Admin-only
-@router.post("/locations", dependencies=[Depends(require_min_role_level(50))])
+# Admin-only (role_level <= 10)
+@router.post("/locations", dependencies=[Depends(require_min_role_level(10))])
 ```
 
-**Public Endpoints:**
+**Public Endpoints (No Authentication):**
 
--   `GET /api/v1/transactions/external/{external_id}` - No auth required (for polling)
--   `POST /api/v1/webhooks/xendit` - Webhook token validation only
+-   `POST /api/v1/transactions` - Create transaction
+-   `GET /api/v1/transactions/external/{external_id}` - Poll transaction status
+-   `POST /api/v1/transactions/{external_id}/photos` - Upload photos
+-   `GET /api/v1/transactions/{external_id}/photos` - Get photo list
+-   `GET /gallery/{external_id}` - Photo gallery page
+
+**Protected Endpoints (Webhook Token):**
+
+-   `POST /api/v1/webhooks/xendit` - Xendit callback (requires `x-callback-token` header)
+
+**Protected Endpoints (Maintenance Token):**
+
+-   `POST /api/v1/maintenance/cleanup` - Cleanup old folders (requires `X-Maintenance-Token` header)
 
 ### Webhook Security
 
@@ -675,6 +820,9 @@ The API supports AES-256-CBC encryption for sensitive endpoints. When enabled, r
 -   `XENDIT_CALLBACK_TOKEN`: Webhook verification token
 -   `ATLAS_ENCRYPTION_KEY`, `ATLAS_ENCRYPTION_IV`: SSO encryption keys
 -   `ENCRYPTION_KEY`, `ENCRYPTION_IV`: Response encryption keys
+-   `CLOUDINARY_API_SECRET`: Cloudinary API secret
+-   `MAIL_PASSWORD`: SMTP password
+-   `MAINTENANCE_TOKEN`: Maintenance endpoint token
 
 ## Testing
 
@@ -685,8 +833,12 @@ The API supports AES-256-CBC encryption for sensitive endpoints. When enabled, r
 ```bash
 curl -X POST http://localhost:8000/api/v1/transactions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_SSO_TOKEN" \
-  -d '{"location_id": 2}'
+  -d '{
+    "location_id": 2,
+    "price_id": "uuid-here",
+    "email": "customer@example.com",
+    "send_invoice": true
+  }'
 ```
 
 **Check Status (Polling):**
@@ -709,6 +861,27 @@ curl -X POST http://localhost:8000/api/v1/webhooks/xendit \
 ```
 
 **Note:** `paid_at` is automatically set to current time when status is `COMPLETED`.
+
+**Upload Photos:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/transactions/TRX-2-20251215092229-57283A15/photos \
+  -F "files=@photo1.jpg" \
+  -F "files=@photo2.jpg"
+```
+
+**Get Photo List:**
+
+```bash
+curl http://localhost:8000/api/v1/transactions/TRX-2-20251215092229-57283A15/photos
+```
+
+**Cleanup Old Folders:**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/maintenance/cleanup?days=14" \
+  -H "X-Maintenance-Token: your_maintenance_token_here"
+```
 
 ### Running Tests
 
@@ -755,14 +928,32 @@ Critical for production deployment:
 -   Max 2 app instances with default settings
 -   Monitor connection usage carefully
 
-### Xendit Configuration Checklist
+### Configuration Checklist
 
-1. ✅ Get API key from Xendit dashboard
-2. ✅ Set `XENDIT_API_KEY` in `.env`
-3. ✅ Deploy backend with public HTTPS URL
-4. ✅ Set `XENDIT_WEBHOOK_URL` in `.env`
-5. ✅ Configure webhook URL in Xendit dashboard
-6. ✅ Copy callback token from Xendit to `XENDIT_CALLBACK_TOKEN`
+**Xendit:**
+1. Get API key from Xendit dashboard
+2. Set `XENDIT_API_KEY` in `.env`
+3. Deploy backend with public HTTPS URL
+4. Set `XENDIT_WEBHOOK_URL` in `.env`
+5. Configure webhook URL in Xendit dashboard
+6. Copy callback token from Xendit to `XENDIT_CALLBACK_TOKEN`
+
+**Cloudinary:**
+1. Create Cloudinary account
+2. Get cloud name, API key, and API secret from dashboard
+3. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` in `.env`
+4. Configure `CLOUDINARY_FOLDER` (default: "photobox")
+
+**Email:**
+1. Configure SMTP server credentials
+2. Set `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` in `.env`
+3. Set `MAIL_FROM` and `MAIL_FROM_NAME`
+4. Choose SSL/TLS or STARTTLS based on your SMTP provider
+
+**Frontend:**
+1. Deploy frontend with gallery page implementation
+2. Set `API_BASE_URL` to your frontend URL (e.g., `https://photobox-frontend.com`)
+3. Implement `/gallery/{external_id}` page on frontend
 
 ## Project Structure
 
@@ -776,47 +967,59 @@ photobox-api/
 │   │   └── session.py             # Database session management
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── master_location.py     # Location model
+│   │   ├── location.py            # Location model
 │   │   ├── transaction.py         # Transaction model
-│   │   └── master_price.py        # Price model
+│   │   └── price.py               # Price model
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── common.py              # Common response schemas
-│   │   ├── master_location.py     # Location schemas
+│   │   ├── location.py            # Location schemas
 │   │   ├── transaction.py         # Transaction schemas
-│   │   └── master_price.py        # Price schemas
+│   │   ├── price.py               # Price schemas
+│   │   └── photo.py               # Photo schemas
 │   ├── repositories/
 │   │   ├── __init__.py
-│   │   ├── master_location_repository.py
+│   │   ├── location_repository.py
 │   │   ├── transaction_repository.py
-│   │   └── master_price_repository.py
+│   │   └── price_repository.py
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── master_location_service.py
-│   │   ├── transaction_service.py  # Core payment logic + Xendit
-│   │   ├── xendit_service.py      # Xendit API integration
-│   │   └── master_price_service.py
+│   │   ├── location_service.py
+│   │   ├── transaction_service.py  # Core payment logic + photo upload
+│   │   ├── xendit_service.py       # Xendit API integration
+│   │   ├── price_service.py        # Price validation
+│   │   ├── cloudinary_service.py   # Photo storage
+│   │   └── email_service.py        # Email notifications
 │   ├── utils/
 │   │   ├── __init__.py
-│   │   └── response_encryption.py # Response encryption wrapper
+│   │   └── response_encryption.py  # Response encryption wrapper
 │   ├── api/
-│   │   ├── deps.py                # Dependencies (auth, db)
+│   │   ├── deps.py                 # Dependencies (auth, db)
 │   │   └── v1/
-│   │       ├── api.py             # Router aggregation
+│   │       ├── api.py              # Router aggregation
 │   │       └── endpoints/
-│   │           ├── master_locations.py
+│   │           ├── locations.py
 │   │           ├── transactions.py
-│   │           ├── webhooks.py     # Xendit webhook handler
-│   │           └── master_prices.py
-│   └── main.py                    # FastAPI application entry point
+│   │           ├── webhooks.py      # Xendit webhook handler
+│   │           ├── prices.py
+│   │           ├── photos.py        # Photo upload endpoint
+│   │           ├── photos_list.py   # Photo list endpoint
+│   │           ├── gallery.py       # Gallery template
+│   │           └── maintenance.py   # Cleanup endpoint
+│   └── main.py                     # FastAPI application entry point
+├── migrations/
+│   ├── 001_initial_schema.sql      # Initial database schema
+│   ├── migrate.py                  # Migration tool
+│   └── README.md                   # Migration documentation
 ├── docs/
-│   └── endpoint.md                # API endpoint specifications
-├── .env.example                   # Environment variables template
+│   ├── endpoint.md                 # API endpoint specifications
+│   └── cloudinary/                 # Cloudinary integration docs
+├── .env.example                    # Environment variables template
 ├── .gitignore
-├── requirements.txt               # Python dependencies
-├── CLAUDE.md                      # Claude Code instructions
-├── PAYMENT_FLOW_DOCUMENTATION.md  # Detailed payment flow
-└── README.md                      # This file
+├── requirements.txt                # Python dependencies
+├── CLAUDE.md                       # Claude Code instructions
+├── PAYMENT_FLOW_DOCUMENTATION.md   # Detailed payment flow
+└── README.md                       # This file
 ```
 
 ## Code Generation (ATAMS)

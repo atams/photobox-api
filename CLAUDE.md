@@ -84,15 +84,38 @@ Model Layer (models/)
 **TransactionService**:
 
 -   Orchestrates transaction creation with Xendit QRIS generation
--   Fixed amount: Rp 40,000 (hardcoded constant `PHOTOBOX_AMOUNT`)
+-   Amount determined by `price_id` (flexible pricing system)
+-   Validates price quota before transaction creation
 -   Auto-generates external IDs: `TRX-{location_id}-{timestamp}-{random}`
 -   Handles webhook processing from Xendit
+-   Manages photo upload to Cloudinary and email notifications
+-   Implements cleanup for expired photo folders (14 days)
+
+**PriceService**:
+
+-   Validates price availability and quota
+-   Checks if price is active before transaction
+-   Calculates remaining quota based on transaction count
 
 **XenditService**:
 
 -   Uses Basic Auth with Base64-encoded API key
 -   Sets QRIS expiration to exactly 15 minutes from creation
 -   Returns `qr_string` for frontend QR code display
+
+**CloudinaryService**:
+
+-   Uploads photos to organized folders: `photobox/{external_id}/`
+-   Validates file format (JPG/JPEG/PNG) and size (≤ 10MB)
+-   Lists photos from folder for gallery display
+-   Deletes entire folder for cleanup operations
+
+**EmailService**:
+
+-   Sends photo gallery notification with optional invoice
+-   Uses Jinja2 templates for email formatting
+-   Supports SSL/TLS and STARTTLS
+-   Includes gallery URL and expiration information
 
 ### Repository Layer Patterns
 
@@ -152,13 +175,17 @@ Transactions (Customer-facing):
 - GET    /api/v1/transactions/external/{external_id}   # Poll transaction status
 
 Photos:
-- GET    /api/v1/photos/list                          # Get transaction photos
+- POST   /api/v1/transactions/{external_id}/photos     # Upload photos
+- GET    /api/v1/transactions/{external_id}/photos     # Get transaction photos
 
-Webhooks:
-- POST   /api/v1/webhooks/xendit                      # Xendit payment callback (protected by x-callback-token)
+Webhooks (Protected by x-callback-token):
+- POST   /api/v1/webhooks/xendit                       # Xendit payment callback
 
 Templates:
-- GET    /gallery/{external_id}                       # Photo gallery page
+- GET    /gallery/{external_id}                        # Photo gallery page
+
+Maintenance (Protected by X-Maintenance-Token):
+- POST   /api/v1/maintenance/cleanup                   # Cleanup old folders
 ```
 
 #### SSO Implementation Pattern
@@ -290,6 +317,38 @@ Three required environment variables:
 
 **Note**: `XENDIT_WEBHOOK_URL` must be configured in both `.env` AND Xendit dashboard settings.
 
+### Cloudinary Configuration
+
+Photo storage configuration:
+
+-   `CLOUDINARY_CLOUD_NAME`: Your Cloudinary cloud name
+-   `CLOUDINARY_API_KEY`: API key from Cloudinary dashboard
+-   `CLOUDINARY_API_SECRET`: API secret from Cloudinary dashboard
+-   `CLOUDINARY_FOLDER`: Base folder for uploads (default: "photobox")
+
+**Organization**: Photos are stored in `{CLOUDINARY_FOLDER}/{external_id}/` folders.
+
+### Email Configuration
+
+SMTP email configuration:
+
+-   `MAIL_SERVER`: SMTP server hostname
+-   `MAIL_PORT`: SMTP port (usually 465 for SSL/TLS, 587 for STARTTLS)
+-   `MAIL_USERNAME`: SMTP username
+-   `MAIL_PASSWORD`: SMTP password
+-   `MAIL_FROM`: From email address
+-   `MAIL_FROM_NAME`: From name displayed in email
+-   `MAIL_SSL_TLS`: Use SSL/TLS (true for port 465)
+-   `MAIL_STARTTLS`: Use STARTTLS (true for port 587)
+
+### Frontend URL Configuration
+
+**Critical Setting**:
+
+-   `API_BASE_URL`: Frontend base URL for gallery links (e.g., `https://photobox-frontend.com`)
+
+**Important**: This should point to your FRONTEND URL, NOT the API URL. The system generates gallery links as `{API_BASE_URL}/gallery/{external_id}` in email notifications.
+
 ### CORS Configuration
 
 CORS (Cross-Origin Resource Sharing) controls which frontend domains can access the API. Configured via environment variables:
@@ -350,6 +409,14 @@ CORS_ALLOW_CREDENTIALS=false
 
 ## Frontend Integration
 
+### Transaction Creation Flow
+
+1. **Create Transaction**: `POST /api/v1/transactions`
+   - Requires: `location_id`, `price_id`, `email`, `send_invoice`
+   - Returns: `external_id`, `qr_string`, and transaction details
+2. **Display QR Code**: Use `qr_string` to generate QR code image
+3. **Start Polling**: Begin polling transaction status
+
 ### Polling Strategy
 
 Frontend must implement 3-second polling on `/api/v1/transactions/external/{external_id}` endpoint:
@@ -357,6 +424,7 @@ Frontend must implement 3-second polling on `/api/v1/transactions/external/{exte
 -   Start immediately after transaction creation
 -   Stop when status reaches terminal state: `COMPLETED`, `FAILED`, or `EXPIRED`
 -   Maximum polling duration: 15 minutes (matches QRIS expiration)
+-   **Response Encryption**: If `ENCRYPTION_ENABLED=true`, decrypt response using AES-256-CBC
 
 ### QR Code Display
 
@@ -371,6 +439,30 @@ PENDING → EXPIRED (15 min timeout)
 ```
 
 Status transitions are one-way only. Terminal states are final.
+
+### Photo Upload Flow
+
+After payment is completed:
+
+1. **Upload Photos**: `POST /api/v1/transactions/{external_id}/photos`
+   - Requires: Multipart form data with photo files (JPG/JPEG/PNG, ≤10MB each)
+   - System automatically sends email with gallery link
+2. **Email Notification**: Customer receives email with:
+   - Gallery URL: `{API_BASE_URL}/gallery/{external_id}`
+   - Optional invoice (if `send_invoice=true`)
+   - Expiration notice (14 days)
+
+### Photo Gallery Page
+
+Frontend must implement `/gallery/{external_id}` page:
+
+1. **Fetch Photos**: `GET /api/v1/transactions/{external_id}/photos`
+   - Returns: `photo_count`, `email_sent_at`, `expiry_date`, and `photos` array
+   - **Response Encryption**: If `ENCRYPTION_ENABLED=true`, decrypt response
+2. **Display**: Show photos with countdown to expiration
+3. **Download**: Allow batch download of all photos
+
+**Photo Expiration**: Photos expire 14 days after `email_sent_at` (midnight WIB).
 
 ## Database Migrations
 
@@ -437,9 +529,26 @@ The `001_initial_schema.sql` includes:
 
 -   Schema creation: `photobox`
 -   Tables: `master_locations`, `master_price`, `transactions`
--   Indexes for performance
--   Foreign key constraints
+-   Indexes for performance (`tr_external_id`, `tr_status`, `tr_price_id`, `created_at`)
+-   Foreign key constraints (location, price)
+-   Unique constraints (`ml_machine_code`, `tr_external_id`)
 -   Sample seed data (optional)
+
+### Schema Details
+
+**master_locations**:
+- `ml_machine_code`: Unique identifier for each photobox machine
+- `ml_is_active`: Controls if location accepts new transactions
+
+**master_price**:
+- Uses UUID for `mp_id` (supports distributed systems)
+- `mp_quota`: NULL means unlimited, otherwise tracks remaining quota
+- `mp_is_active`: Controls if price is available for transactions
+
+**transactions**:
+- `tr_email`: Customer email for photo delivery
+- `tr_send_invoice`: Flag to include invoice in email
+- `tr_email_sent_at`: Timestamp when photos were emailed (triggers 14-day expiration)
 
 ## Testing
 
@@ -507,7 +616,12 @@ curl -X GET http://localhost:8000/api/v1/transactions/1 \
 ```bash
 curl -X POST http://localhost:8000/api/v1/transactions \
   -H "Content-Type: application/json" \
-  -d '{"location_id": 2}'
+  -d '{
+    "location_id": 2,
+    "price_id": "uuid-here",
+    "email": "customer@example.com",
+    "send_invoice": true
+  }'
 ```
 
 **Check Status (Polling)**:
@@ -531,21 +645,68 @@ curl -X POST http://localhost:8000/api/v1/webhooks/xendit \
 
 **Note**: The `paid_at` timestamp is automatically set to the current time when `status` is `COMPLETED`. No need to include it in the webhook payload.
 
+**Upload Photos**:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/transactions/TRX-2-20251215092229-57283A15/photos \
+  -F "files=@photo1.jpg" \
+  -F "files=@photo2.jpg" \
+  -F "files=@photo3.jpg"
+```
+
+**Get Photo List**:
+
+```bash
+curl http://localhost:8000/api/v1/transactions/TRX-2-20251215092229-57283A15/photos
+```
+
+**Cleanup Old Folders (Maintenance)**:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/maintenance/cleanup?days=14" \
+  -H "X-Maintenance-Token: your_maintenance_token_here"
+```
+
 ## Important Implementation Notes
 
 ### When Adding New Features
 
 1. Check if ATAMS toolkit provides the functionality before implementing
 2. Follow the existing layer separation: API → Service → Repository → Model
-3. Use ATAMS exception classes: `NotFoundException`, `BadRequestException`, `UnprocessableEntityException`, etc.
-4. All async operations (Xendit calls) use `httpx.AsyncClient`
+3. Use ATAMS exception classes: `NotFoundException`, `BadRequestException`, `UnprocessableEntityException`, `ConflictException`, etc.
+4. All async operations (Xendit calls, photo uploads, emails) use async/await pattern
+5. For external service integrations (Cloudinary, SMTP), create dedicated service classes
 
 ### Database Operations
 
 -   Always use repository methods for database access
 -   Commit/rollback happens at service layer, not repository layer
 -   Use `joinedload` for relationship loading to avoid N+1 queries
--   Index critical query columns (external_id, status, created_at)
+-   Index critical query columns (external_id, status, created_at, price_id)
+-   Use transactions for operations that modify multiple tables
+
+### File Upload Operations
+
+-   Validate file type before upload (JPG/JPEG/PNG only for photos)
+-   Validate file size (max 10MB per file)
+-   Use Cloudinary service for photo storage
+-   Organize uploads in folders by `external_id`
+-   Handle upload failures gracefully with proper error messages
+
+### Email Operations
+
+-   Use Jinja2 templates for email formatting
+-   Send emails asynchronously to avoid blocking API responses
+-   Log email send failures but don't fail the entire operation
+-   Update `tr_email_sent_at` timestamp after successful send
+-   Include unsubscribe or expiration information in emails
+
+### Maintenance Operations
+
+-   Use background tasks or scheduled jobs for cleanup
+-   Protect maintenance endpoints with secure tokens
+-   Log all cleanup operations with success/failure counts
+-   Never delete database records, only external resources (Cloudinary folders)
 
 ### Logging
 
