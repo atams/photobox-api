@@ -25,7 +25,7 @@ async def view_photo_gallery(
     Display photo gallery for a transaction.
 
     This endpoint renders an HTML page showing all photos uploaded for a transaction.
-    Users can view thumbnails and download individual photos or all photos at once.
+    Users can view and download individual photos or all photos at once.
 
     Args:
         external_id: Transaction external ID
@@ -64,16 +64,11 @@ async def view_photo_gallery(
         if not photo_urls:
             raise NotFoundException(f"No photos found for transaction {external_id}")
 
-        # Prepare photo data with thumbnail URLs
+        # Prepare photo data
         photos: List[Dict[str, str]] = []
         for url in photo_urls:
-            # Generate thumbnail URL (Cloudinary transformation)
-            # c_fill,h_300,w_300 = crop to fill 300x300
-            thumbnail_url = url.replace("/upload/", "/upload/c_fill,h_300,w_300/")
-
             photos.append({
-                "url": url,
-                "thumbnail_url": thumbnail_url
+                "url": url
             })
 
         # Calculate expiry date (14 days from email sent, at 00:00 WIB on that day)

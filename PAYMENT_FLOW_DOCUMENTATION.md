@@ -56,9 +56,10 @@ Dokumentasi ini menjelaskan **end-to-end payment flow** menggunakan Xendit QRIS 
 ```
 
 **Key Points:**
-- Frontend **HANYA** berinteraksi dengan Backend (tidak langsung ke Xendit)
-- Xendit **otomatis** hit webhook ke Backend saat payment completed
-- Frontend **polling** endpoint status untuk mendapatkan update real-time
+
+-   Frontend **HANYA** berinteraksi dengan Backend (tidak langsung ke Xendit)
+-   Xendit **otomatis** hit webhook ke Backend saat payment completed
+-   Frontend **polling** endpoint status untuk mendapatkan update real-time
 
 ---
 
@@ -69,6 +70,7 @@ Dokumentasi ini menjelaskan **end-to-end payment flow** menggunakan Xendit QRIS 
 **Trigger:** User memulai session photobox
 
 **Frontend Action:**
+
 ```javascript
 POST /api/v1/transactions
 Headers:
@@ -80,6 +82,7 @@ Body:
 ```
 
 **Backend Process:**
+
 1. Validate location (harus exist dan active)
 2. Generate unique `external_id` dengan format: `TRX-{location_id}-{timestamp}-{random}`
 3. Call Xendit API untuk generate QRIS code
@@ -88,27 +91,30 @@ Body:
 6. Return response ke frontend
 
 **Response:**
+
 ```json
 {
-  "transaction_id": 123,
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "amount": 40000,
-  "status": "PENDING",
-  "qr_string": "00020101021126580...",
-  "created_at": "2025-12-15T09:22:29.123Z"
+    "transaction_id": 123,
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "amount": 40000,
+    "status": "PENDING",
+    "qr_string": "00020101021126580...",
+    "created_at": "2025-12-15T09:22:29.123Z"
 }
 ```
 
 **Frontend Next Action:**
-- Display QR code dari `qr_string`
-- Save `external_id` untuk polling
-- Start polling timer
+
+-   Display QR code dari `qr_string`
+-   Save `external_id` untuk polling
+-   Start polling timer
 
 ---
 
 ### Step 2: Display QR Code
 
 **Frontend Action:**
+
 1. Convert `qr_string` menjadi QR code image menggunakan library (e.g., `qrcode.js`)
 2. Display QR code di screen
 3. Tampilkan amount: **Rp 40.000**
@@ -116,6 +122,7 @@ Body:
 5. Tampilkan instruksi: "Scan QR code dengan aplikasi e-wallet Anda"
 
 **Example UI:**
+
 ```
 ╔════════════════════════════╗
 ║   SCAN UNTUK MEMBAYAR      ║
@@ -139,60 +146,61 @@ Body:
 Start polling **immediately** after receiving transaction response
 
 **Polling Strategy:**
+
 ```javascript
 const pollInterval = 3000; // 3 seconds
 const maxDuration = 15 * 60 * 1000; // 15 minutes
 let startTime = Date.now();
 
 const pollingTimer = setInterval(async () => {
-  // Check if expired
-  if (Date.now() - startTime > maxDuration) {
-    clearInterval(pollingTimer);
-    showExpiredMessage();
-    return;
-  }
+    // Check if expired
+    if (Date.now() - startTime > maxDuration) {
+        clearInterval(pollingTimer);
+        showExpiredMessage();
+        return;
+    }
 
-  // Poll status
-  const response = await fetch(
-    `/api/v1/transactions/external/${externalId}`
-  );
-  const data = await response.json();
+    // Poll status
+    const response = await fetch(`/api/v1/transactions/external/${externalId}`);
+    const data = await response.json();
 
-  // Check status
-  if (data.status === 'COMPLETED') {
-    clearInterval(pollingTimer);
-    showSuccessMessage(data);
-    return;
-  }
+    // Check status
+    if (data.status === 'COMPLETED') {
+        clearInterval(pollingTimer);
+        showSuccessMessage(data);
+        return;
+    }
 
-  if (data.status === 'FAILED' || data.status === 'EXPIRED') {
-    clearInterval(pollingTimer);
-    showFailedMessage(data);
-    return;
-  }
+    if (data.status === 'FAILED' || data.status === 'EXPIRED') {
+        clearInterval(pollingTimer);
+        showFailedMessage(data);
+        return;
+    }
 
-  // Status still PENDING, continue polling
+    // Status still PENDING, continue polling
 }, pollInterval);
 ```
 
 **API Call:**
+
 ```javascript
 GET /api/v1/transactions/external/TRX-2-20251215092229-57283A15
 ```
 
 **Response (While Pending):**
+
 ```json
 {
-  "transaction_id": 123,
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "amount": 40000,
-  "status": "PENDING",
-  "qr_string": "00020101021126580...",
-  "paid_at": null,
-  "location": {
-    "id": 2,
-    "name": "Booth A"
-  }
+    "transaction_id": 123,
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "amount": 40000,
+    "status": "PENDING",
+    "qr_string": "00020101021126580...",
+    "paid_at": null,
+    "location": {
+        "id": 2,
+        "name": "Booth A"
+    }
 }
 ```
 
@@ -201,15 +209,17 @@ GET /api/v1/transactions/external/TRX-2-20251215092229-57283A15
 ### Step 4: User Scans QR Code
 
 **User Action:**
+
 1. Buka aplikasi e-wallet (GoPay, OVO, Dana, ShopeePay, dll)
 2. Pilih "Scan QR"
 3. Scan QR code yang ditampilkan di screen
 4. Confirm payment di aplikasi
 
 **What Happens:**
-- Payment diproses oleh e-wallet provider
-- E-wallet provider notify Xendit
-- Xendit process payment
+
+-   Payment diproses oleh e-wallet provider
+-   E-wallet provider notify Xendit
+-   Xendit process payment
 
 ---
 
@@ -234,6 +244,7 @@ Body:
 ```
 
 **Backend Process:**
+
 1. Verify `x-callback-token` header (security check)
 2. Find transaction by `external_id`
 3. Update status to `COMPLETED`
@@ -242,9 +253,10 @@ Body:
 6. Return success response to Xendit
 
 **Response to Xendit:**
+
 ```json
 {
-  "message": "Transaction updated"
+    "message": "Transaction updated"
 }
 ```
 
@@ -263,27 +275,29 @@ GET /api/v1/transactions/external/TRX-2-20251215092229-57283A15
 ```
 
 **Response (After Payment):**
+
 ```json
 {
-  "transaction_id": 123,
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "amount": 40000,
-  "status": "COMPLETED",  // ✅ Changed!
-  "qr_string": "00020101021126580...",
-  "paid_at": "2025-12-15T09:25:10.878Z",  // ✅ Now has value
-  "location": {
-    "id": 2,
-    "name": "Booth A"
-  }
+    "transaction_id": 123,
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "amount": 40000,
+    "status": "COMPLETED", // ✅ Changed!
+    "qr_string": "00020101021126580...",
+    "paid_at": "2025-12-15T09:25:10.878Z", // ✅ Now has value
+    "location": {
+        "id": 2,
+        "name": "Booth A"
+    }
 }
 ```
 
 **Frontend Detection:**
+
 ```javascript
 if (data.status === 'COMPLETED') {
-  clearInterval(pollingTimer);
-  showSuccessMessage();
-  proceedToNextStep(); // Start photo session, etc.
+    clearInterval(pollingTimer);
+    showSuccessMessage();
+    proceedToNextStep(); // Start photo session, etc.
 }
 ```
 
@@ -292,12 +306,14 @@ if (data.status === 'COMPLETED') {
 ### Step 7: Show Success & Proceed
 
 **Frontend Action:**
+
 1. Stop polling
 2. Hide QR code
 3. Show success animation/message
 4. Proceed to next step (photo session)
 
 **Example UI:**
+
 ```
 ╔════════════════════════════╗
 ║   ✅ PEMBAYARAN BERHASIL   ║
@@ -320,33 +336,37 @@ if (data.status === 'COMPLETED') {
 **Purpose:** Create new transaction and generate QRIS code
 
 **Request:**
+
 ```json
 {
-  "location_id": 2
+    "location_id": 2
 }
 ```
 
 **Response (201 Created):**
+
 ```json
 {
-  "transaction_id": 123,
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "amount": 40000,
-  "status": "PENDING",
-  "qr_string": "00020101021126580009ID.CO.QRIS...",
-  "created_at": "2025-12-15T09:22:29.123Z"
+    "transaction_id": 123,
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "amount": 40000,
+    "status": "PENDING",
+    "qr_string": "00020101021126580009ID.CO.QRIS...",
+    "created_at": "2025-12-15T09:22:29.123Z"
 }
 ```
 
 **Errors:**
-- `404` - Location not found
-- `422` - Location is not active
-- `500` - Xendit API error
+
+-   `404` - Location not found
+-   `422` - Location is not active
+-   `500` - Xendit API error
 
 **Frontend Usage:**
-- Call **once** saat user mulai session
-- Save `external_id` untuk polling
-- Display `qr_string` as QR code
+
+-   Call **once** saat user mulai session
+-   Save `external_id` untuk polling
+-   Display `qr_string` as QR code
 
 ---
 
@@ -357,39 +377,44 @@ if (data.status === 'COMPLETED') {
 **Purpose:** Get current transaction status (designed for polling)
 
 **Request:**
+
 ```
 GET /api/v1/transactions/external/TRX-2-20251215092229-57283A15
 ```
 
 **Response (200 OK):**
+
 ```json
 {
-  "transaction_id": 123,
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "amount": 40000,
-  "status": "PENDING",  // or "COMPLETED", "FAILED", "EXPIRED"
-  "qr_string": "00020101021126580...",
-  "paid_at": null,  // or "2025-12-15T09:25:10.878Z" if completed
-  "location": {
-    "id": 2,
-    "name": "Booth A"
-  }
+    "transaction_id": 123,
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "amount": 40000,
+    "status": "PENDING", // or "COMPLETED", "FAILED", "EXPIRED"
+    "qr_string": "00020101021126580...",
+    "paid_at": null, // or "2025-12-15T09:25:10.878Z" if completed
+    "location": {
+        "id": 2,
+        "name": "Booth A"
+    }
 }
 ```
 
 **Errors:**
-- `404` - Transaction not found
+
+-   `404` - Transaction not found
 
 **Frontend Usage:**
-- Poll **every 3 seconds** after creating transaction
-- Stop polling when status changes to: `COMPLETED`, `FAILED`, or `EXPIRED`
-- Stop polling after **15 minutes**
-- **Lightweight endpoint** - safe untuk frequent calls
+
+-   Poll **every 3 seconds** after creating transaction
+-   Stop polling when status changes to: `COMPLETED`, `FAILED`, or `EXPIRED`
+-   Stop polling after **15 minutes**
+-   **Lightweight endpoint** - safe untuk frequent calls
 
 **Performance:**
-- Optimized with database indexing
-- Minimal query overhead
-- Supports concurrent polling dari multiple kiosks
+
+-   Optimized with database indexing
+-   Minimal query overhead
+-   Supports concurrent polling dari multiple kiosks
 
 ---
 
@@ -402,18 +427,20 @@ GET /api/v1/transactions/external/TRX-2-20251215092229-57283A15
 **⚠️ Frontend NEVER calls this endpoint!**
 
 **Request (from Xendit):**
+
 ```json
 {
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "status": "COMPLETED",
-  "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "status": "COMPLETED",
+    "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
 }
 ```
 
 **Security:**
-- Requires `x-callback-token` header
-- Token verified against environment variable
-- Rejects unauthorized requests
+
+-   Requires `x-callback-token` header
+-   Token verified against environment variable
+-   Rejects unauthorized requests
 
 **Frontend:** Tidak perlu tahu tentang endpoint ini
 
@@ -428,153 +455,160 @@ import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 
 function PaymentScreen({ locationId }) {
-  const [transaction, setTransaction] = useState(null);
-  const [status, setStatus] = useState('idle'); // idle, pending, completed, failed, expired
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes in seconds
-  const pollingInterval = useRef(null);
-  const timerInterval = useRef(null);
+    const [transaction, setTransaction] = useState(null);
+    const [status, setStatus] = useState('idle'); // idle, pending, completed, failed, expired
+    const [qrCodeUrl, setQrCodeUrl] = useState('');
+    const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes in seconds
+    const pollingInterval = useRef(null);
+    const timerInterval = useRef(null);
 
-  // Step 1: Create Transaction
-  const createTransaction = async () => {
-    try {
-      const response = await fetch('/api/v1/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location_id: locationId })
-      });
+    // Step 1: Create Transaction
+    const createTransaction = async () => {
+        try {
+            const response = await fetch('/api/v1/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ location_id: locationId }),
+            });
 
-      if (!response.ok) throw new Error('Failed to create transaction');
+            if (!response.ok) throw new Error('Failed to create transaction');
 
-      const data = await response.json();
-      setTransaction(data);
-      setStatus('pending');
+            const data = await response.json();
+            setTransaction(data);
+            setStatus('pending');
 
-      // Generate QR Code
-      const qrUrl = await QRCode.toDataURL(data.qr_string);
-      setQrCodeUrl(qrUrl);
+            // Generate QR Code
+            const qrUrl = await QRCode.toDataURL(data.qr_string);
+            setQrCodeUrl(qrUrl);
 
-      // Start polling
-      startPolling(data.external_id);
+            // Start polling
+            startPolling(data.external_id);
 
-      // Start countdown timer
-      startTimer();
-    } catch (error) {
-      console.error('Error creating transaction:', error);
-      setStatus('failed');
-    }
-  };
-
-  // Step 2: Polling
-  const startPolling = (externalId) => {
-    pollingInterval.current = setInterval(async () => {
-      try {
-        const response = await fetch(
-          `/api/v1/transactions/external/${externalId}`
-        );
-
-        if (!response.ok) throw new Error('Failed to fetch status');
-
-        const data = await response.json();
-
-        // Update transaction data
-        setTransaction(data);
-
-        // Check status
-        if (data.status === 'COMPLETED') {
-          stopPolling();
-          setStatus('completed');
-        } else if (data.status === 'FAILED') {
-          stopPolling();
-          setStatus('failed');
-        } else if (data.status === 'EXPIRED') {
-          stopPolling();
-          setStatus('expired');
+            // Start countdown timer
+            startTimer();
+        } catch (error) {
+            console.error('Error creating transaction:', error);
+            setStatus('failed');
         }
-      } catch (error) {
-        console.error('Polling error:', error);
-      }
-    }, 3000); // Poll every 3 seconds
-  };
+    };
 
-  const stopPolling = () => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
-    }
-    if (timerInterval.current) {
-      clearInterval(timerInterval.current);
-      timerInterval.current = null;
-    }
-  };
+    // Step 2: Polling
+    const startPolling = (externalId) => {
+        pollingInterval.current = setInterval(async () => {
+            try {
+                const response = await fetch(
+                    `/api/v1/transactions/external/${externalId}`
+                );
 
-  // Step 3: Countdown Timer
-  const startTimer = () => {
-    timerInterval.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          stopPolling();
-          setStatus('expired');
-          return 0;
+                if (!response.ok) throw new Error('Failed to fetch status');
+
+                const data = await response.json();
+
+                // Update transaction data
+                setTransaction(data);
+
+                // Check status
+                if (data.status === 'COMPLETED') {
+                    stopPolling();
+                    setStatus('completed');
+                } else if (data.status === 'FAILED') {
+                    stopPolling();
+                    setStatus('failed');
+                } else if (data.status === 'EXPIRED') {
+                    stopPolling();
+                    setStatus('expired');
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+        }, 3000); // Poll every 3 seconds
+    };
+
+    const stopPolling = () => {
+        if (pollingInterval.current) {
+            clearInterval(pollingInterval.current);
+            pollingInterval.current = null;
         }
-        return prev - 1;
-      });
-    }, 1000);
-  };
+        if (timerInterval.current) {
+            clearInterval(timerInterval.current);
+            timerInterval.current = null;
+        }
+    };
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
+    // Step 3: Countdown Timer
+    const startTimer = () => {
+        timerInterval.current = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    stopPolling();
+                    setStatus('expired');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
 
-  // Format time
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => stopPolling();
+    }, []);
 
-  return (
-    <div className="payment-screen">
-      {status === 'idle' && (
-        <button onClick={createTransaction}>Start Payment</button>
-      )}
+    // Format time
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
-      {status === 'pending' && transaction && (
-        <div className="qr-display">
-          <h2>Scan untuk Membayar</h2>
-          <img src={qrCodeUrl} alt="QR Code" />
-          <p className="amount">Rp {transaction.amount.toLocaleString()}</p>
-          <p className="timer">Expired in: {formatTime(timeLeft)}</p>
-          <p className="instruction">
-            Scan QR code dengan aplikasi e-wallet Anda
-          </p>
+    return (
+        <div className="payment-screen">
+            {status === 'idle' && (
+                <button onClick={createTransaction}>Start Payment</button>
+            )}
+
+            {status === 'pending' && transaction && (
+                <div className="qr-display">
+                    <h2>Scan untuk Membayar</h2>
+                    <img src={qrCodeUrl} alt="QR Code" />
+                    <p className="amount">
+                        Rp {transaction.amount.toLocaleString()}
+                    </p>
+                    <p className="timer">Expired in: {formatTime(timeLeft)}</p>
+                    <p className="instruction">
+                        Scan QR code dengan aplikasi e-wallet Anda
+                    </p>
+                </div>
+            )}
+
+            {status === 'completed' && (
+                <div className="success">
+                    <h2>✅ Pembayaran Berhasil!</h2>
+                    <p>Rp {transaction.amount.toLocaleString()}</p>
+                    <p>
+                        Paid at:{' '}
+                        {new Date(transaction.paid_at).toLocaleTimeString()}
+                    </p>
+                </div>
+            )}
+
+            {status === 'expired' && (
+                <div className="expired">
+                    <h2>⏱️ QR Code Expired</h2>
+                    <button onClick={createTransaction}>
+                        Create New Transaction
+                    </button>
+                </div>
+            )}
+
+            {status === 'failed' && (
+                <div className="failed">
+                    <h2>❌ Payment Failed</h2>
+                    <button onClick={createTransaction}>Try Again</button>
+                </div>
+            )}
         </div>
-      )}
-
-      {status === 'completed' && (
-        <div className="success">
-          <h2>✅ Pembayaran Berhasil!</h2>
-          <p>Rp {transaction.amount.toLocaleString()}</p>
-          <p>Paid at: {new Date(transaction.paid_at).toLocaleTimeString()}</p>
-        </div>
-      )}
-
-      {status === 'expired' && (
-        <div className="expired">
-          <h2>⏱️ QR Code Expired</h2>
-          <button onClick={createTransaction}>Create New Transaction</button>
-        </div>
-      )}
-
-      {status === 'failed' && (
-        <div className="failed">
-          <h2>❌ Payment Failed</h2>
-          <button onClick={createTransaction}>Try Again</button>
-        </div>
-      )}
-    </div>
-  );
+    );
 }
 
 export default PaymentScreen;
@@ -586,41 +620,41 @@ export default PaymentScreen;
 
 ### Common Errors & Solutions
 
-| Error | Status Code | Cause | Solution |
-|-------|-------------|-------|----------|
-| Location not found | 404 | Invalid `location_id` | Verify location exists |
-| Location inactive | 422 | Location is disabled | Enable location or use different one |
-| Xendit API error | 500 | Xendit service down | Retry or contact support |
-| Transaction not found | 404 | Invalid `external_id` | Check transaction was created |
-| QRIS expired | - | 15 minutes passed | Create new transaction |
+| Error                 | Status Code | Cause                 | Solution                             |
+| --------------------- | ----------- | --------------------- | ------------------------------------ |
+| Location not found    | 404         | Invalid `location_id` | Verify location exists               |
+| Location inactive     | 422         | Location is disabled  | Enable location or use different one |
+| Xendit API error      | 500         | Xendit service down   | Retry or contact support             |
+| Transaction not found | 404         | Invalid `external_id` | Check transaction was created        |
+| QRIS expired          | -           | 15 minutes passed     | Create new transaction               |
 
 ### Frontend Error Handling
 
 ```javascript
 try {
-  const response = await fetch('/api/v1/transactions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ location_id: 2 })
-  });
+    const response = await fetch('/api/v1/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location_id: 2 }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
+    if (!response.ok) {
+        const error = await response.json();
 
-    if (response.status === 404) {
-      showError('Location tidak ditemukan');
-    } else if (response.status === 422) {
-      showError('Location tidak aktif');
-    } else {
-      showError('Gagal membuat transaksi, silakan coba lagi');
+        if (response.status === 404) {
+            showError('Location tidak ditemukan');
+        } else if (response.status === 422) {
+            showError('Location tidak aktif');
+        } else {
+            showError('Gagal membuat transaksi, silakan coba lagi');
+        }
+        return;
     }
-    return;
-  }
 
-  const data = await response.json();
-  // Process success...
+    const data = await response.json();
+    // Process success...
 } catch (error) {
-  showError('Koneksi error, periksa jaringan Anda');
+    showError('Koneksi error, periksa jaringan Anda');
 }
 ```
 
@@ -642,19 +676,21 @@ XENDIT_CALLBACK_TOKEN=xnd_development_your_callback_token_here
 **How to get these values:**
 
 1. **XENDIT_API_KEY:**
-   - Login to https://dashboard.xendit.co
-   - Go to Settings → Developers → API Keys
-   - Copy "Secret Key"
+
+    - Login to https://dashboard.xendit.co
+    - Go to Settings → Developers → API Keys
+    - Copy "Secret Key"
 
 2. **XENDIT_WEBHOOK_URL:**
-   - Your public backend URL + `/api/v1/webhooks/xendit`
-   - Example: `https://api.photobox.com/api/v1/webhooks/xendit`
-   - Must be **publicly accessible** (not localhost)
+
+    - Your public backend URL + `/api/v1/webhooks/xendit`
+    - Example: `https://api.photobox.com/api/v1/webhooks/xendit`
+    - Must be **publicly accessible** (not localhost)
 
 3. **XENDIT_CALLBACK_TOKEN:**
-   - Login to https://dashboard.xendit.co
-   - Go to Settings → Webhooks
-   - Copy "Callback Verification Token"
+    - Login to https://dashboard.xendit.co
+    - Go to Settings → Webhooks
+    - Copy "Callback Verification Token"
 
 ### Xendit Dashboard Setup
 
@@ -671,6 +707,7 @@ XENDIT_CALLBACK_TOKEN=xnd_development_your_callback_token_here
 ### Manual Testing with cURL
 
 #### 1. Create Transaction
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/transactions \
   -H "Content-Type: application/json" \
@@ -678,11 +715,13 @@ curl -X POST http://localhost:8080/api/v1/transactions \
 ```
 
 #### 2. Check Status (Polling)
+
 ```bash
 curl http://localhost:8080/api/v1/transactions/external/TRX-2-20251215092229-57283A15
 ```
 
 #### 3. Simulate Webhook (Testing Only)
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/webhooks/xendit \
   -H "Content-Type: application/json" \
@@ -716,9 +755,10 @@ PENDING
 ```
 
 **Important:**
-- Status can only move forward, never backward
-- `COMPLETED`, `FAILED`, and `EXPIRED` are final states
-- Stop polling when reaching any final state
+
+-   Status can only move forward, never backward
+-   `COMPLETED`, `FAILED`, and `EXPIRED` are final states
+-   Stop polling when reaching any final state
 
 ---
 
@@ -726,25 +766,27 @@ PENDING
 
 ### Polling Strategy
 
-- **Interval:** 3 seconds (balance between responsiveness and server load)
-- **Duration:** Maximum 15 minutes (matches QRIS expiration)
-- **Optimization:** Endpoint uses database indexing for fast queries
+-   **Interval:** 3 seconds (balance between responsiveness and server load)
+-   **Duration:** Maximum 15 minutes (matches QRIS expiration)
+-   **Optimization:** Endpoint uses database indexing for fast queries
 
 ### Best Practices
 
 1. **Always stop polling:**
-   - When status changes to final state
-   - When QR code expires
-   - When user cancels
+
+    - When status changes to final state
+    - When QR code expires
+    - When user cancels
 
 2. **Handle network errors:**
-   - Don't stop polling on temporary network errors
-   - Retry failed polling requests
-   - Show network error indicator
+
+    - Don't stop polling on temporary network errors
+    - Retry failed polling requests
+    - Show network error indicator
 
 3. **Clean up intervals:**
-   - Clear intervals in cleanup/unmount
-   - Prevent memory leaks
+    - Clear intervals in cleanup/unmount
+    - Prevent memory leaks
 
 ---
 
@@ -753,35 +795,40 @@ PENDING
 ### For Frontend Developers:
 
 1. **NEVER implement webhook endpoint in frontend**
-   - Webhook is backend-only
-   - Contains sensitive verification logic
+
+    - Webhook is backend-only
+    - Contains sensitive verification logic
 
 2. **NEVER expose Xendit credentials in frontend**
-   - All Xendit API calls go through backend
-   - Frontend only calls your own API
+
+    - All Xendit API calls go through backend
+    - Frontend only calls your own API
 
 3. **Trust backend status**
-   - Status updates come from verified webhook
-   - Polling endpoint returns authoritative data
+    - Status updates come from verified webhook
+    - Polling endpoint returns authoritative data
 
 ---
 
 ## Support & Contact
 
 **For Backend Issues:**
-- Check backend logs
-- Verify `.env` configuration
-- Test webhook with cURL
+
+-   Check backend logs
+-   Verify `.env` configuration
+-   Test webhook with cURL
 
 **For Xendit Issues:**
-- Xendit Dashboard: https://dashboard.xendit.co
-- Xendit Documentation: https://docs.xendit.co
-- Xendit Support: support@xendit.co
+
+-   Xendit Dashboard: https://dashboard.xendit.co
+-   Xendit Documentation: https://docs.xendit.co
+-   Xendit Support: support@xendit.co
 
 **For Frontend Issues:**
-- Verify API endpoint URLs
-- Check network tab in browser DevTools
-- Confirm polling is running
+
+-   Verify API endpoint URLs
+-   Check network tab in browser DevTools
+-   Confirm polling is running
 
 ---
 
@@ -790,24 +837,26 @@ PENDING
 ### Version 1.0.0 (2025-12-15)
 
 **Features Implemented:**
-- ✅ QRIS expiration time: 15 minutes
-- ✅ Webhook verification with callback token
-- ✅ Frontend polling support with `qr_string` in response
-- ✅ Real-time payment status updates
-- ✅ Production-ready security
+
+-   ✅ QRIS expiration time: 15 minutes
+-   ✅ Webhook verification with callback token
+-   ✅ Frontend polling support with `qr_string` in response
+-   ✅ Real-time payment status updates
+-   ✅ Production-ready security
 
 **Breaking Changes:**
-- None (initial release)
+
+-   None (initial release)
 
 ---
 
 ## Quick Reference Card
 
-| Action | Endpoint | Method | Frequency |
-|--------|----------|--------|-----------|
-| Create QRIS | `/api/v1/transactions` | POST | Once per session |
-| Check Status | `/api/v1/transactions/external/{id}` | GET | Every 3 seconds |
-| Webhook | `/api/v1/webhooks/xendit` | POST | Auto by Xendit |
+| Action       | Endpoint                             | Method | Frequency        |
+| ------------ | ------------------------------------ | ------ | ---------------- |
+| Create QRIS  | `/api/v1/transactions`               | POST   | Once per session |
+| Check Status | `/api/v1/transactions/external/{id}` | GET    | Every 3 seconds  |
+| Webhook      | `/api/v1/webhooks/xendit`            | POST   | Auto by Xendit   |
 
 **Payment Amount:** Fixed at **Rp 40.000**
 
@@ -816,10 +865,11 @@ PENDING
 **Polling Interval:** **3 seconds**
 
 **Stop Polling When:**
-- Status is `COMPLETED` ✅
-- Status is `FAILED` ❌
-- Status is `EXPIRED` ⏱️
-- 15 minutes elapsed ⏰
+
+-   Status is `COMPLETED` ✅
+-   Status is `FAILED` ❌
+-   Status is `EXPIRED` ⏱️
+-   15 minutes elapsed ⏰
 
 ---
 

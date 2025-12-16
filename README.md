@@ -4,79 +4,79 @@ A FastAPI-based QRIS payment system for photobox kiosks, built with the ATAMS to
 
 ## Table of Contents
 
-- [Key Features](#key-features)
-- [Technology Stack](#technology-stack)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Running the Application](#running-the-application)
-- [API Endpoints](#api-endpoints)
-- [Architecture](#architecture)
-- [Payment Flow](#payment-flow)
-- [Security](#security)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Project Structure](#project-structure)
+-   [Key Features](#key-features)
+-   [Technology Stack](#technology-stack)
+-   [Prerequisites](#prerequisites)
+-   [Installation](#installation)
+-   [Configuration](#configuration)
+-   [Running the Application](#running-the-application)
+-   [API Endpoints](#api-endpoints)
+-   [Architecture](#architecture)
+-   [Payment Flow](#payment-flow)
+-   [Security](#security)
+-   [Testing](#testing)
+-   [Deployment](#deployment)
+-   [Project Structure](#project-structure)
 
 ## Key Features
 
-- **QRIS Payment Integration**: Seamless integration with Xendit for QRIS payment generation and processing
-- **Polling-Based Status Updates**: Real-time payment status tracking via 3-second polling mechanism
-- **Location Management**: Master data management for photobox machine locations
-- **Webhook Processing**: Secure webhook endpoint for payment status notifications from Xendit
-- **Atlas SSO Integration**: Enterprise-grade authentication via ATAMS toolkit
-- **Auto-Generated Transaction IDs**: Unique external ID generation with location and timestamp
-- **15-Minute QRIS Expiration**: Automatic expiration handling for payment codes
+-   **QRIS Payment Integration**: Seamless integration with Xendit for QRIS payment generation and processing
+-   **Polling-Based Status Updates**: Real-time payment status tracking via 3-second polling mechanism
+-   **Location Management**: Master data management for photobox machine locations
+-   **Webhook Processing**: Secure webhook endpoint for payment status notifications from Xendit
+-   **Atlas SSO Integration**: Enterprise-grade authentication via ATAMS toolkit
+-   **Auto-Generated Transaction IDs**: Unique external ID generation with location and timestamp
+-   **15-Minute QRIS Expiration**: Automatic expiration handling for payment codes
 
 ## Technology Stack
 
-- **Framework**: FastAPI
-- **Database**: PostgreSQL (Aiven)
-- **ORM**: SQLAlchemy
-- **Authentication**: Atlas SSO (ATAMS)
-- **Payment Gateway**: Xendit (QRIS)
-- **Validation**: Pydantic
-- **Server**: Uvicorn
-- **Toolkit**: ATAMS (Atlas Toolkit for API Management System)
+-   **Framework**: FastAPI
+-   **Database**: PostgreSQL (Aiven)
+-   **ORM**: SQLAlchemy
+-   **Authentication**: Atlas SSO (ATAMS)
+-   **Payment Gateway**: Xendit (QRIS)
+-   **Validation**: Pydantic
+-   **Server**: Uvicorn
+-   **Toolkit**: ATAMS (Atlas Toolkit for API Management System)
 
 ## Prerequisites
 
-- Python 3.10+
-- PostgreSQL database
-- Xendit account with API access
-- Atlas SSO credentials (for authentication)
+-   Python 3.10+
+-   PostgreSQL database
+-   Xendit account with API access
+-   Atlas SSO credentials (for authentication)
 
 ## Installation
 
 1. **Clone the repository:**
 
-   ```bash
-   git clone https://github.com/[username]/photobox-api.git
-   cd photobox-api
-   ```
+    ```bash
+    git clone https://github.com/[username]/photobox-api.git
+    cd photobox-api
+    ```
 
 2. **Create a virtual environment:**
 
-   ```bash
-   python -m venv venv
-   ```
+    ```bash
+    python -m venv venv
+    ```
 
 3. **Activate the virtual environment:**
 
-   - Linux/Mac:
-     ```bash
-     source venv/bin/activate
-     ```
-   - Windows:
-     ```bash
-     venv\Scripts\activate
-     ```
+    - Linux/Mac:
+        ```bash
+        source venv/bin/activate
+        ```
+    - Windows:
+        ```bash
+        venv\Scripts\activate
+        ```
 
 4. **Install dependencies:**
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 ## Configuration
 
@@ -128,9 +128,10 @@ LOG_FILE_PATH=logs/app.log
 ```
 
 **Important Notes:**
-- `XENDIT_WEBHOOK_URL` must be publicly accessible and configured in both `.env` AND Xendit dashboard
-- For Aiven free tier (20 connection limit), keep default pool settings
-- Total connections = `(DB_POOL_SIZE + DB_MAX_OVERFLOW) × app_instances`
+
+-   `XENDIT_WEBHOOK_URL` must be publicly accessible and configured in both `.env` AND Xendit dashboard
+-   For Aiven free tier (20 connection limit), keep default pool settings
+-   Total connections = `(DB_POOL_SIZE + DB_MAX_OVERFLOW) × app_instances`
 
 ## Running the Application
 
@@ -147,9 +148,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 **Access Points:**
-- API Documentation (Swagger): http://localhost:8000/docs
-- API Documentation (ReDoc): http://localhost:8000/redoc
-- Health Check: http://localhost:8000/health
+
+-   API Documentation (Swagger): http://localhost:8000/docs
+-   API Documentation (ReDoc): http://localhost:8000/redoc
+-   Health Check: http://localhost:8000/health
 
 ## API Endpoints
 
@@ -160,118 +162,174 @@ Base URL: `/api/v1`
 **Base Path:** `/api/v1/transactions`
 
 #### POST /api/v1/transactions
+
 Create a new transaction and generate QRIS payment code.
 
 **Authorization:** Required (Atlas SSO)
 
 **Request Body:**
+
 ```json
 {
-  "location_id": 2
+    "location_id": 2
 }
 ```
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Transaction created successfully",
-  "data": {
-    "tr_id": 1,
-    "tr_external_id": "TRX-2-20251215092229-57283A15",
-    "tr_location_id": 2,
-    "tr_amount": 40000,
-    "tr_status": "PENDING",
-    "tr_qris_string": "00020101021226...",
-    "tr_qris_url": "https://d.xnd.io/...",
-    "tr_expired_at": "2025-12-15T09:37:29",
-    "tr_created_at": "2025-12-15T09:22:29"
-  }
+    "success": true,
+    "message": "Transaction created successfully",
+    "data": {
+        "tr_id": 1,
+        "tr_external_id": "TRX-2-20251215092229-57283A15",
+        "tr_location_id": 2,
+        "tr_amount": 40000,
+        "tr_status": "PENDING",
+        "tr_qris_string": "00020101021226...",
+        "tr_qris_url": "https://d.xnd.io/...",
+        "tr_expired_at": "2025-12-15T09:37:29",
+        "tr_created_at": "2025-12-15T09:22:29"
+    }
 }
 ```
 
 **Business Logic:**
-- Amount is fixed at Rp 40,000 (`PHOTOBOX_AMOUNT` constant)
-- External ID format: `TRX-{location_id}-{timestamp}-{random}`
-- QRIS expires in exactly 15 minutes
-- Initial status is `PENDING`
+
+-   Amount is fixed at Rp 40,000 (`PHOTOBOX_AMOUNT` constant)
+-   External ID format: `TRX-{location_id}-{timestamp}-{random}`
+-   QRIS expires in exactly 15 minutes
+-   Initial status is `PENDING`
 
 #### GET /api/v1/transactions/external/{external_id}
+
 Get transaction status by external ID (for polling).
 
 **Authorization:** Not required (public endpoint for frontend polling)
 
-**Response:**
+**Response (Normal):**
+
 ```json
 {
-  "success": true,
-  "message": "Transaction retrieved successfully",
-  "data": {
-    "tr_id": 1,
-    "tr_external_id": "TRX-2-20251215092229-57283A15",
-    "tr_status": "COMPLETED",
-    "tr_paid_at": "2025-12-15T09:25:30",
-    "tr_amount": 40000
-  }
+    "success": true,
+    "message": "Transaction retrieved successfully",
+    "data": {
+        "tr_id": 1,
+        "tr_external_id": "TRX-2-20251215092229-57283A15",
+        "tr_status": "COMPLETED",
+        "tr_paid_at": "2025-12-15T09:25:30",
+        "tr_amount": 40000
+    }
+}
+```
+
+**Response (Encrypted, when `ENCRYPTION_ENABLED=true`):**
+
+```json
+{
+    "data": "base64_encoded_encrypted_payload"
 }
 ```
 
 **Status Values:**
-- `PENDING`: Payment not yet completed
-- `COMPLETED`: Payment successful
-- `FAILED`: Payment failed
-- `EXPIRED`: QRIS code expired (15 minutes)
+
+-   `PENDING`: Payment not yet completed
+-   `COMPLETED`: Payment successful
+-   `FAILED`: Payment failed
+-   `EXPIRED`: QRIS code expired (15 minutes)
+
+#### GET /api/v1/transactions/{external_id}/photos
+
+Get all photos for a transaction (for frontend gallery).
+
+**Authorization:** Not required (public endpoint for gallery display)
+
+**Response (Normal):**
+
+```json
+{
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "photo_count": 12,
+    "email_sent_at": "2025-12-15T10:00:00",
+    "expiry_date": "2025-12-29T00:00:00",
+    "photos": [
+        {
+            "url": "https://res.cloudinary.com/..."
+        }
+    ]
+}
+```
+
+**Response (Encrypted, when `ENCRYPTION_ENABLED=true`):**
+
+```json
+{
+    "data": "base64_encoded_encrypted_payload"
+}
+```
+
+**Notes:**
+
+-   Photos expire 14 days after email sent
+-   Returns 404 if transaction not found or no photos uploaded
 
 #### GET /api/v1/transactions/count
+
 Get total count of transactions by status.
 
 **Authorization:** Required (Atlas SSO)
 
 **Query Parameters:**
-- `status`: Filter by status (optional, comma-separated: "COMPLETED,PENDING")
+
+-   `status`: Filter by status (optional, comma-separated: "COMPLETED,PENDING")
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Transaction count retrieved successfully",
-  "data": {
-    "count": 42
-  }
+    "success": true,
+    "message": "Transaction count retrieved successfully",
+    "data": {
+        "count": 42
+    }
 }
 ```
 
 #### GET /api/v1/transactions (List)
+
 List all transactions with pagination and filtering.
 
 **Authorization:** Required (Atlas SSO)
 
 **Query Parameters:**
-- `search`: Filter by external ID or location name (optional)
-- `skip`: Offset pagination (default: 0)
-- `limit`: Records per page (1-1000, default: 100)
+
+-   `search`: Filter by external ID or location name (optional)
+-   `skip`: Offset pagination (default: 0)
+-   `limit`: Records per page (1-1000, default: 100)
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Transactions retrieved successfully",
-  "data": [
-    {
-      "tr_id": 1,
-      "tr_external_id": "TRX-2-20251215092229-57283A15",
-      "tr_status": "COMPLETED",
-      "tr_amount": 40000,
-      "location": {
-        "ml_id": 2,
-        "ml_name": "Mall Kelapa Gading"
-      }
-    }
-  ],
-  "total": 100,
-  "page": 1,
-  "size": 100,
-  "pages": 1
+    "success": true,
+    "message": "Transactions retrieved successfully",
+    "data": [
+        {
+            "tr_id": 1,
+            "tr_external_id": "TRX-2-20251215092229-57283A15",
+            "tr_status": "COMPLETED",
+            "tr_amount": 40000,
+            "location": {
+                "ml_id": 2,
+                "ml_name": "Mall Kelapa Gading"
+            }
+        }
+    ],
+    "total": 100,
+    "page": 1,
+    "size": 100,
+    "pages": 1
 }
 ```
 
@@ -282,36 +340,40 @@ List all transactions with pagination and filtering.
 **Base Path:** `/api/v1/locations`
 
 #### GET /api/v1/locations
+
 List all photobox locations with pagination.
 
 **Authorization:** Required (Atlas SSO)
 
 **Query Parameters:**
-- `search`: Filter by location name (optional)
-- `skip`: Offset pagination (default: 0)
-- `limit`: Records per page (1-1000, default: 100)
+
+-   `search`: Filter by location name (optional)
+-   `skip`: Offset pagination (default: 0)
+-   `limit`: Records per page (1-1000, default: 100)
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Locations retrieved successfully",
-  "data": [
-    {
-      "ml_id": 1,
-      "ml_name": "Mall Taman Anggrek",
-      "ml_address": "Jl. Taman Anggrek No. 1",
-      "ml_created_at": "2025-12-15T09:00:00"
-    }
-  ],
-  "total": 10,
-  "page": 1,
-  "size": 100,
-  "pages": 1
+    "success": true,
+    "message": "Locations retrieved successfully",
+    "data": [
+        {
+            "ml_id": 1,
+            "ml_name": "Mall Taman Anggrek",
+            "ml_address": "Jl. Taman Anggrek No. 1",
+            "ml_created_at": "2025-12-15T09:00:00"
+        }
+    ],
+    "total": 10,
+    "page": 1,
+    "size": 100,
+    "pages": 1
 }
 ```
 
 #### GET /api/v1/locations/{id}
+
 Get single location by ID.
 
 **Authorization:** Required (Atlas SSO)
@@ -319,24 +381,28 @@ Get single location by ID.
 **Response:** Single location object
 
 #### POST /api/v1/locations
+
 Create new location.
 
 **Authorization:** Required (Atlas SSO, Admin level)
 
 **Request Body:**
+
 ```json
 {
-  "ml_name": "Mall Senayan City",
-  "ml_address": "Jl. Asia Afrika No. 8"
+    "ml_name": "Mall Senayan City",
+    "ml_address": "Jl. Asia Afrika No. 8"
 }
 ```
 
 #### PUT /api/v1/locations/{id}
+
 Update existing location.
 
 **Authorization:** Required (Atlas SSO, Admin level)
 
 #### DELETE /api/v1/locations/{id}
+
 Delete location.
 
 **Authorization:** Required (Atlas SSO, Admin level)
@@ -346,24 +412,27 @@ Delete location.
 ### Webhooks
 
 #### POST /api/v1/webhooks/xendit
+
 Xendit webhook endpoint for payment status updates.
 
 **Authorization:** Xendit callback token (header: `x-callback-token`)
 
 **Request Body (from Xendit):**
+
 ```json
 {
-  "external_id": "TRX-2-20251215092229-57283A15",
-  "status": "COMPLETED",
-  "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
+    "external_id": "TRX-2-20251215092229-57283A15",
+    "status": "COMPLETED",
+    "xendit_id": "qr_5d408580-80cf-471a-a69f-976daadf1b84"
 }
 ```
 
 **Security:**
-- Validates `x-callback-token` header
-- Returns 401 if token missing
-- Returns 403 if token invalid
-- `paid_at` timestamp set automatically on COMPLETED status
+
+-   Validates `x-callback-token` header
+-   Returns 401 if token missing
+-   Returns 403 if token invalid
+-   `paid_at` timestamp set automatically on COMPLETED status
 
 ---
 
@@ -372,26 +441,31 @@ Xendit webhook endpoint for payment status updates.
 **Base Path:** `/api/v1/prices`
 
 #### GET /api/v1/prices
+
 List all price configurations.
 
 **Authorization:** Required (Atlas SSO)
 
 #### GET /api/v1/prices/{id}
+
 Get single price by ID.
 
 **Authorization:** Required (Atlas SSO)
 
 #### POST /api/v1/prices
+
 Create new price configuration.
 
 **Authorization:** Required (Atlas SSO, Admin level)
 
 #### PUT /api/v1/prices/{id}
+
 Update existing price.
 
 **Authorization:** Required (Atlas SSO, Admin level)
 
 #### DELETE /api/v1/prices/{id}
+
 Delete price.
 
 **Authorization:** Required (Atlas SSO, Admin level)
@@ -405,31 +479,33 @@ Delete price.
 **Tables:**
 
 1. **master_locations** - Photobox machine locations
-   - `ml_id` (PK): Location ID
-   - `ml_name`: Location name
-   - `ml_address`: Physical address
-   - `ml_created_at`: Creation timestamp
-   - **Constraints**: Unique location names
+
+    - `ml_id` (PK): Location ID
+    - `ml_name`: Location name
+    - `ml_address`: Physical address
+    - `ml_created_at`: Creation timestamp
+    - **Constraints**: Unique location names
 
 2. **transactions** - Payment transactions
-   - `tr_id` (PK): Transaction ID
-   - `tr_external_id` (Unique): External transaction identifier
-   - `tr_location_id` (FK): References master_locations
-   - `tr_amount`: Payment amount (Rp 40,000 fixed)
-   - `tr_status`: Status (PENDING/COMPLETED/FAILED/EXPIRED)
-   - `tr_qris_string`: Full QRIS payload for QR generation
-   - `tr_qris_url`: Xendit QRIS URL
-   - `tr_xendit_id`: Xendit payment identifier
-   - `tr_expired_at`: QRIS expiration timestamp (15 minutes)
-   - `tr_paid_at`: Payment completion timestamp
-   - `tr_created_at`: Creation timestamp
-   - **Indexes**: `tr_external_id`, `tr_status`, `tr_created_at`
+
+    - `tr_id` (PK): Transaction ID
+    - `tr_external_id` (Unique): External transaction identifier
+    - `tr_location_id` (FK): References master_locations
+    - `tr_amount`: Payment amount (Rp 40,000 fixed)
+    - `tr_status`: Status (PENDING/COMPLETED/FAILED/EXPIRED)
+    - `tr_qris_string`: Full QRIS payload for QR generation
+    - `tr_qris_url`: Xendit QRIS URL
+    - `tr_xendit_id`: Xendit payment identifier
+    - `tr_expired_at`: QRIS expiration timestamp (15 minutes)
+    - `tr_paid_at`: Payment completion timestamp
+    - `tr_created_at`: Creation timestamp
+    - **Indexes**: `tr_external_id`, `tr_status`, `tr_created_at`
 
 3. **master_prices** - Price configurations
-   - `mp_id` (PK): Price ID
-   - `mp_name`: Price name/description
-   - `mp_amount`: Price amount
-   - `mp_created_at`: Creation timestamp
+    - `mp_id` (PK): Price ID
+    - `mp_name`: Price name/description
+    - `mp_amount`: Price amount
+    - `mp_created_at`: Creation timestamp
 
 ### Layered Architecture (ATAMS Pattern)
 
@@ -474,26 +550,28 @@ Request → ATAMS Middleware → Endpoint → Service → Repository → Databas
 
 1. **Frontend submits** `location_id` to `/api/v1/transactions`
 2. **TransactionService generates**:
-   - External ID: `TRX-{location_id}-{timestamp}-{random}`
-   - Amount: Rp 40,000 (fixed constant)
-   - Expiration: Current time + 15 minutes
+    - External ID: `TRX-{location_id}-{timestamp}-{random}`
+    - Amount: Rp 40,000 (fixed constant)
+    - Expiration: Current time + 15 minutes
 3. **XenditService creates QRIS**:
-   - Basic Auth with Base64-encoded API key
-   - Returns `qr_string` (for QR code display) and `qr_url`
+    - Basic Auth with Base64-encoded API key
+    - Returns `qr_string` (for QR code display) and `qr_url`
 4. **Backend saves transaction** with status `PENDING`
 5. **Frontend receives** transaction data including `qr_string`
 
 ### Frontend Polling Strategy
 
 **Requirements:**
-- Poll `/api/v1/transactions/external/{external_id}` every **3 seconds**
-- Start immediately after transaction creation
-- Stop when status reaches terminal state: `COMPLETED`, `FAILED`, or `EXPIRED`
-- Maximum polling duration: **15 minutes** (matches QRIS expiration)
+
+-   Poll `/api/v1/transactions/external/{external_id}` every **3 seconds**
+-   Start immediately after transaction creation
+-   Stop when status reaches terminal state: `COMPLETED`, `FAILED`, or `EXPIRED`
+-   Maximum polling duration: **15 minutes** (matches QRIS expiration)
 
 **QR Code Display:**
-- Use `tr_qris_string` field to generate QR code image
-- Frontend library: `qrcode.js` or similar
+
+-   Use `tr_qris_string` field to generate QR code image
+-   Frontend library: `qrcode.js` or similar
 
 ### Transaction Status Flow
 
@@ -517,16 +595,19 @@ Status transitions are one-way only. Terminal states are final.
 ### Authentication & Authorization
 
 **Atlas SSO Integration:**
-- Enterprise SSO authentication via ATAMS toolkit
-- Token validation through `ATLAS_SSO_URL`
-- Application identifier: `ATLAS_APP_CODE`
-- Token decryption: `ATLAS_ENCRYPTION_KEY` + `ATLAS_ENCRYPTION_IV`
+
+-   Enterprise SSO authentication via ATAMS toolkit
+-   Token validation through `ATLAS_SSO_URL`
+-   Application identifier: `ATLAS_APP_CODE`
+-   Token decryption: `ATLAS_ENCRYPTION_KEY` + `ATLAS_ENCRYPTION_IV`
 
 **Authorization Levels:**
-- **Level 1** (>= 1): Regular users (read access)
-- **Level 50** (>= 50): Administrators (full CRUD)
+
+-   **Level 1** (>= 1): Regular users (read access)
+-   **Level 50** (>= 50): Administrators (full CRUD)
 
 **Usage in Endpoints:**
+
 ```python
 from app.api.deps import require_auth, require_min_role_level
 
@@ -538,37 +619,69 @@ from app.api.deps import require_auth, require_min_role_level
 ```
 
 **Public Endpoints:**
-- `GET /api/v1/transactions/external/{external_id}` - No auth required (for polling)
-- `POST /api/v1/webhooks/xendit` - Webhook token validation only
+
+-   `GET /api/v1/transactions/external/{external_id}` - No auth required (for polling)
+-   `POST /api/v1/webhooks/xendit` - Webhook token validation only
 
 ### Webhook Security
 
 Xendit webhook endpoint validates:
+
 1. Presence of `x-callback-token` header
 2. Token matches `XENDIT_CALLBACK_TOKEN` from environment
 3. Returns 401 if missing, 403 if invalid
 
 ### Response Encryption
 
-Optional AES encryption for API responses:
-- Enable with `ENCRYPTION_ENABLED=true`
-- Uses `ENCRYPTION_KEY` and `ENCRYPTION_IV` from environment
-- Transparent to frontend (handled by ATAMS middleware)
+The API supports AES-256-CBC encryption for sensitive endpoints. When enabled, responses are encrypted before being sent to the client.
+
+**Configuration:**
+
+-   `ENCRYPTION_ENABLED`: Enable/disable response encryption (default: false)
+-   `ENCRYPTION_KEY`: 32-character AES encryption key
+-   `ENCRYPTION_IV`: 16-character initialization vector
+
+**Encrypted Endpoints:**
+
+-   `GET /api/v1/transactions/external/{external_id}` - Transaction polling endpoint
+-   `GET /api/v1/transactions/{external_id}/photos` - Photos list endpoint
+
+**Encryption Details:**
+
+-   Algorithm: AES-256-CBC
+-   Padding: PKCS7
+-   Output: Base64-encoded encrypted JSON
+-   Frontend must decrypt using the same key and IV
+
+**Response Format (when encrypted):**
+
+```json
+{
+    "data": "base64_encoded_encrypted_payload"
+}
+```
+
+**Implementation Files:**
+
+-   Encryption service: [app/core/encryption.py](app/core/encryption.py)
+-   Response wrapper: [app/utils/response_encryption.py](app/utils/response_encryption.py)
 
 ### Environment Variables
 
 **Critical secrets that must not be committed:**
-- `DATABASE_URL`: PostgreSQL connection string
-- `XENDIT_API_KEY`: Xendit secret key
-- `XENDIT_CALLBACK_TOKEN`: Webhook verification token
-- `ATLAS_ENCRYPTION_KEY`, `ATLAS_ENCRYPTION_IV`: SSO encryption keys
-- `ENCRYPTION_KEY`, `ENCRYPTION_IV`: Response encryption keys
+
+-   `DATABASE_URL`: PostgreSQL connection string
+-   `XENDIT_API_KEY`: Xendit secret key
+-   `XENDIT_CALLBACK_TOKEN`: Webhook verification token
+-   `ATLAS_ENCRYPTION_KEY`, `ATLAS_ENCRYPTION_IV`: SSO encryption keys
+-   `ENCRYPTION_KEY`, `ENCRYPTION_IV`: Response encryption keys
 
 ## Testing
 
 ### Manual Testing with cURL
 
 **Create Transaction:**
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/transactions \
   -H "Content-Type: application/json" \
@@ -577,11 +690,13 @@ curl -X POST http://localhost:8000/api/v1/transactions \
 ```
 
 **Check Status (Polling):**
+
 ```bash
 curl http://localhost:8000/api/v1/transactions/external/TRX-2-20251215092229-57283A15
 ```
 
 **Simulate Webhook (Development Only):**
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/webhooks/xendit \
   -H "Content-Type: application/json" \
@@ -613,28 +728,32 @@ pytest tests/test_transaction_service.py
 ### Environment-Specific Configuration
 
 **Development:**
-- `DEBUG=true`
-- Detailed logging
-- CORS allows all origins
-- Local database
+
+-   `DEBUG=true`
+-   Detailed logging
+-   CORS allows all origins
+-   Local database
 
 **Production:**
-- `DEBUG=false`
-- Error logging only
-- CORS restricted to specific domains
-- Connection pooling optimized for cloud database
-- `XENDIT_WEBHOOK_URL` must be publicly accessible HTTPS endpoint
+
+-   `DEBUG=false`
+-   Error logging only
+-   CORS restricted to specific domains
+-   Connection pooling optimized for cloud database
+-   `XENDIT_WEBHOOK_URL` must be publicly accessible HTTPS endpoint
 
 ### Database Connection Pooling
 
 Critical for production deployment:
-- `DB_POOL_SIZE=3`: Base pool size
-- `DB_MAX_OVERFLOW=5`: Additional connections
-- Total connections = `(3 + 5) × app_instances`
+
+-   `DB_POOL_SIZE=3`: Base pool size
+-   `DB_MAX_OVERFLOW=5`: Additional connections
+-   Total connections = `(3 + 5) × app_instances`
 
 **For Aiven Free Tier (20 connection limit):**
-- Max 2 app instances with default settings
-- Monitor connection usage carefully
+
+-   Max 2 app instances with default settings
+-   Monitor connection usage carefully
 
 ### Xendit Configuration Checklist
 
@@ -651,7 +770,8 @@ Critical for production deployment:
 photobox-api/
 ├── app/
 │   ├── core/
-│   │   └── config.py              # Application configuration
+│   │   ├── config.py              # Application configuration
+│   │   └── encryption.py          # AES encryption service
 │   ├── db/
 │   │   └── session.py             # Database session management
 │   ├── models/
@@ -676,6 +796,9 @@ photobox-api/
 │   │   ├── transaction_service.py  # Core payment logic + Xendit
 │   │   ├── xendit_service.py      # Xendit API integration
 │   │   └── master_price_service.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── response_encryption.py # Response encryption wrapper
 │   ├── api/
 │   │   ├── deps.py                # Dependencies (auth, db)
 │   │   └── v1/
@@ -709,11 +832,12 @@ atams generate department
 ```
 
 This creates:
-- Model in `app/models/`
-- Schema in `app/schemas/`
-- Repository in `app/repositories/`
-- Service in `app/services/`
-- Router in `app/api/v1/endpoints/`
+
+-   Model in `app/models/`
+-   Schema in `app/schemas/`
+-   Repository in `app/repositories/`
+-   Service in `app/services/`
+-   Router in `app/api/v1/endpoints/`
 
 ## Important Implementation Notes
 
@@ -726,10 +850,10 @@ This creates:
 
 ### Database Operations
 
-- Always use repository methods for database access
-- Commit/rollback happens at service layer, not repository layer
-- Use `joinedload` for relationship loading (avoid N+1 queries)
-- Index critical query columns: `external_id`, `status`, `created_at`
+-   Always use repository methods for database access
+-   Commit/rollback happens at service layer, not repository layer
+-   Use `joinedload` for relationship loading (avoid N+1 queries)
+-   Index critical query columns: `external_id`, `status`, `created_at`
 
 ### Logging
 
@@ -743,21 +867,23 @@ logger.info("Transaction created", extra={"external_id": external_id})
 ### Error Handling
 
 ATAMS provides automatic exception handling:
-- `NotFoundException` → 404
-- `BadRequestException` → 400
-- `UnprocessableEntityException` → 422
-- `InternalServerException` → 500
+
+-   `NotFoundException` → 404
+-   `BadRequestException` → 400
+-   `UnprocessableEntityException` → 422
+-   `InternalServerException` → 500
 
 ## Documentation References
 
-- Payment flow details: [PAYMENT_FLOW_DOCUMENTATION.md](PAYMENT_FLOW_DOCUMENTATION.md)
-- API specifications: [docs/endpoint.md](docs/endpoint.md)
-- Project instructions: [CLAUDE.md](CLAUDE.md)
-- ATAMS toolkit: See official ATAMS documentation
+-   Payment flow details: [PAYMENT_FLOW_DOCUMENTATION.md](PAYMENT_FLOW_DOCUMENTATION.md)
+-   API specifications: [docs/endpoint.md](docs/endpoint.md)
+-   Project instructions: [CLAUDE.md](CLAUDE.md)
+-   ATAMS toolkit: See official ATAMS documentation
 
 ## Support
 
 For questions or issues:
-- Project repository: [GitHub Issues](https://github.com/[username]/photobox-api/issues)
-- ATAMS toolkit: See ATAMS documentation
-- Xendit integration: [Xendit API Docs](https://developers.xendit.co/)
+
+-   Project repository: [GitHub Issues](https://github.com/[username]/photobox-api/issues)
+-   ATAMS toolkit: See ATAMS documentation
+-   Xendit integration: [Xendit API Docs](https://developers.xendit.co/)

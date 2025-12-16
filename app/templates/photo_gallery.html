@@ -248,7 +248,7 @@
         <div class="gallery">
             {% for photo in photos %}
             <div class="photo-card">
-                <img src="{{ photo.thumbnail_url }}" alt="Photo {{ loop.index }}" loading="lazy">
+                <img src="{{ photo.url }}" alt="Photo {{ loop.index }}" loading="lazy">
                 <div class="actions">
                     <a href="{{ photo.url }}" target="_blank" class="btn btn-view">👁️ Lihat</a>
                     <a href="{{ photo.url }}" download="photo_{{ loop.index }}.jpg" class="btn btn-download">⬇️ Download</a>

@@ -75,8 +75,8 @@ class TransactionRepository(BaseRepository[Transaction]):
             db: Database session
             location_ids: List of location IDs to filter
             status: List of status values to filter
-            date_from: Start date filter (required)
-            date_to: End date filter (required)
+            date_from: Start date filter (optional, None = no date filter)
+            date_to: End date filter (optional, None = no date filter)
             search: Search text for external_id, xendit_id, location.name
             sort_by: Column to sort by
             sort_order: Sort order (asc/desc)

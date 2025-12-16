@@ -166,3 +166,18 @@ class CleanupResponse(BaseModel):
     deleted_count: int = Field(..., description="Number of folders deleted")
     folders: List[str] = Field(..., description="List of deleted folder names (external_ids)")
     message: str = Field(..., description="Status message")
+
+
+# Transaction List Response
+class TransactionListMeta(BaseModel):
+    """Schema for transaction list metadata"""
+    page: int = Field(..., description="Current page number")
+    limit: int = Field(..., description="Items per page")
+    total_items: int = Field(..., description="Total number of items")
+    total_pages: int = Field(..., description="Total number of pages")
+
+
+class TransactionListResponse(BaseModel):
+    """Schema for transaction list response"""
+    meta: TransactionListMeta = Field(..., description="Pagination metadata")
+    data: List[TransactionListItem] = Field(..., description="List of transactions")

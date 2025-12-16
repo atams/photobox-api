@@ -302,8 +302,8 @@ class TransactionService:
             db: Database session
             location_ids: Filter by location IDs
             status: Filter by status values
-            date_from: Start date (required)
-            date_to: End date (required)
+            date_from: Start date (optional, None = no date filter, auto-filled to 1 year before date_to if only date_to provided)
+            date_to: End date (optional, None = no date filter, auto-filled to 1 year after date_from if only date_from provided)
             page: Page number (1-indexed)
             limit: Items per page
             search: Search text
@@ -321,15 +321,23 @@ class TransactionService:
             raise BadRequestException("Page must be at least 1")
         if limit < 1 or limit > 100:
             raise BadRequestException("Limit must be between 1 and 100")
-        if not date_from or not date_to:
-            raise BadRequestException("date_from and date_to are required")
 
-        # Validate date range (max 365 days)
-        date_diff = (date_to - date_from).days
-        if date_diff > 365:
-            raise BadRequestException("Date range cannot exceed 365 days")
-        if date_diff < 0:
-            raise BadRequestException("date_to must be after date_from")
+        # Auto-fill missing date if only one is provided
+        if date_from and not date_to:
+            # If only date_from provided, set date_to to 1 year ahead
+            date_to = date_from + timedelta(days=365)
+        elif date_to and not date_from:
+            # If only date_to provided, set date_from to 1 year before
+            date_from = date_to - timedelta(days=365)
+
+        # Validate date range if both dates are provided
+        if date_from and date_to:
+            # Validate date range (max 365 days)
+            date_diff = (date_to - date_from).days
+            if date_diff > 365:
+                raise BadRequestException("Date range cannot exceed 365 days")
+            if date_diff < 0:
+                raise BadRequestException("date_to must be after date_from")
 
         skip = (page - 1) * limit
 

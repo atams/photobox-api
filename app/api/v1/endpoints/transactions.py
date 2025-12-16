@@ -1,5 +1,13 @@
 """
 Transaction Endpoints - API routes for transactions
+
+Protected Endpoints (Admin only - role_level <= 10):
+- GET /api/v1/transactions - List transactions
+- GET /api/v1/transactions/{id} - Get transaction detail by ID
+
+Public Endpoints (No authentication):
+- POST /api/v1/transactions - Create transaction (customer-facing)
+- GET /api/v1/transactions/external/{external_id} - Poll transaction status (customer-facing)
 """
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
@@ -7,14 +15,17 @@ from typing import Optional, List
 from datetime import date
 
 from atams.db import get_db
+from app.api.deps import require_auth, require_min_role_level
 from app.core.config import settings
 from app.services.transaction_service import TransactionService
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionCreateResponse,
     TransactionDetailResponse,
-    TransactionByExternalIdResponse
+    TransactionByExternalIdResponse,
+    TransactionListResponse
 )
+from app.utils.response_encryption import encrypt_response_if_enabled
 
 router = APIRouter()
 
@@ -74,44 +85,65 @@ async def get_transaction_by_external_id(
 
     **Performance Note:**
     This endpoint is optimized for frequent polling with minimal database queries.
+
+    **Response Encryption:**
+    Response is encrypted if ENCRYPTION_ENABLED=true in settings.
     """
-    return await transaction_service.get_transaction_by_external_id(db, external_id)
+    result = await transaction_service.get_transaction_by_external_id(db, external_id)
+    return encrypt_response_if_enabled(result)
 
 
-@router.get("/{id}", response_model=TransactionDetailResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/{id}",
+    response_model=TransactionDetailResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_min_role_level(10))]
+)
 async def get_transaction_detail(
     id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_auth)
 ):
     """
-    Get transaction detail by ID
+    Get transaction detail by ID (Admin only - role_level <= 10)
 
     - **id**: Transaction ID
     """
     return await transaction_service.get_transaction_detail(db, id)
 
 
-@router.get("", status_code=status.HTTP_200_OK)
+@router.get(
+    "",
+    response_model=TransactionListResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_min_role_level(10))]
+)
 async def get_transactions(
     location_ids: Optional[List[int]] = Query(None, description="Filter by location IDs"),
     status: Optional[List[str]] = Query(None, description="Filter by status (PENDING, COMPLETED, FAILED, EXPIRED)"),
-    date_from: date = Query(..., description="Start date (required)"),
-    date_to: date = Query(..., description="End date (required)"),
+    date_from: Optional[date] = Query(None, description="Start date (optional, empty = no date filter)"),
+    date_to: Optional[date] = Query(None, description="End date (optional, empty = no date filter)"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=100, description="Items per page (1-100)"),
     search: Optional[str] = Query(None, description="Search text"),
     sort_by: str = Query("created_at", description="Sort column"),
     sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_auth)
 ):
     """
-    Get paginated list of transactions
+    Get paginated list of transactions (Admin only - role_level <= 10)
 
     **Query Parameters:**
     - **location_ids**: Filter by location IDs (empty = all locations)
     - **status**: Filter by status values (PENDING, COMPLETED, FAILED, EXPIRED) (empty = all)
-    - **date_from**: Start date (required)
-    - **date_to**: End date (required, max range: 365 days)
+    - **date_from**: Start date (optional)
+      - If empty and date_to empty: no date filter
+      - If empty and date_to provided: auto-set to 1 year before date_to
+    - **date_to**: End date (optional)
+      - If empty and date_from empty: no date filter
+      - If empty and date_from provided: auto-set to 1 year after date_from
+      - Max range: 365 days
     - **page**: Page number (minimum 1)
     - **limit**: Items per page (1-100)
     - **search**: Search in external_id, xendit_id, or location name

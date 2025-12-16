@@ -11,11 +11,13 @@ from app.repositories.transaction_repository import TransactionRepository
 from app.services.cloudinary_service import CloudinaryService
 from app.core.config import settings
 from atams.exceptions import NotFoundException
+from app.utils.response_encryption import encrypt_response_if_enabled
+from app.schemas.photo import PhotosListResponse, PhotoItem
 
 router = APIRouter()
 
 
-@router.get("/{external_id}/photos")
+@router.get("/{external_id}/photos", response_model=PhotosListResponse)
 async def get_transaction_photos(
     external_id: str,
     db: Session = Depends(get_db)
@@ -34,6 +36,9 @@ async def get_transaction_photos(
 
     Raises:
         NotFoundException: If transaction not found or no photos uploaded
+
+    Response Encryption:
+        Response is encrypted if ENCRYPTION_ENABLED=true in settings.
     """
     # Get transaction repository
     transaction_repository = TransactionRepository()
@@ -71,31 +76,27 @@ async def get_transaction_photos(
                 details={"external_id": external_id}
             )
 
-        # Prepare photo data with thumbnail URLs
-        photos: List[Dict[str, str]] = []
+        # Prepare photo data
+        photos: List[PhotoItem] = []
         for url in photo_urls:
-            # Generate thumbnail URL (Cloudinary transformation)
-            # c_fill,h_300,w_300 = crop to fill 300x300
-            thumbnail_url = url.replace("/upload/", "/upload/c_fill,h_300,w_300/")
-
-            photos.append({
-                "url": url,
-                "thumbnail_url": thumbnail_url
-            })
+            photos.append(PhotoItem(url=url))
 
         # Calculate expiry date (14 days from email sent, at 00:00 WIB)
         expiry_datetime = (transaction.tr_email_sent_at + timedelta(days=14)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
 
-        # Return response
-        return {
+        # Prepare response data
+        response_data = {
             "external_id": external_id,
             "photo_count": len(photos),
             "email_sent_at": transaction.tr_email_sent_at.isoformat(),
             "expiry_date": expiry_datetime.isoformat(),
             "photos": photos
         }
+
+        # Return encrypted response if enabled
+        return encrypt_response_if_enabled(response_data)
 
     except NotFoundException:
         # Re-raise NotFoundException
