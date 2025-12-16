@@ -59,7 +59,7 @@ A FastAPI-based QRIS payment system for photobox kiosks, built with the ATAMS to
 1. **Clone the repository:**
 
     ```bash
-    git clone https://github.com/[username]/photobox-api.git
+    git clone https://github.com/GratiaManullang03/photobox-api.git
     cd photobox-api
     ```
 
@@ -335,6 +335,7 @@ Upload photos for a completed transaction.
 **Request:** Multipart form data with photo files
 
 **Requirements:**
+
 -   Transaction must exist and status must be COMPLETED
 -   Email must not have been sent yet
 -   Each file must be JPG/JPEG/PNG format
@@ -359,6 +360,7 @@ Upload photos for a completed transaction.
 ```
 
 **Process:**
+
 1. Validates transaction and files
 2. Uploads photos to Cloudinary folder: `photobox/{external_id}/`
 3. Sends email with gallery link and optional invoice
@@ -580,6 +582,7 @@ Clean up Cloudinary folders older than specified days.
 ```
 
 **Process:**
+
 1. Finds transactions with `email_sent_at` older than specified days
 2. Deletes corresponding Cloudinary folders
 3. Returns summary of deleted and failed folders
@@ -931,6 +934,7 @@ Critical for production deployment:
 ### Configuration Checklist
 
 **Xendit:**
+
 1. Get API key from Xendit dashboard
 2. Set `XENDIT_API_KEY` in `.env`
 3. Deploy backend with public HTTPS URL
@@ -939,18 +943,21 @@ Critical for production deployment:
 6. Copy callback token from Xendit to `XENDIT_CALLBACK_TOKEN`
 
 **Cloudinary:**
+
 1. Create Cloudinary account
 2. Get cloud name, API key, and API secret from dashboard
 3. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` in `.env`
 4. Configure `CLOUDINARY_FOLDER` (default: "photobox")
 
 **Email:**
+
 1. Configure SMTP server credentials
 2. Set `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` in `.env`
 3. Set `MAIL_FROM` and `MAIL_FROM_NAME`
 4. Choose SSL/TLS or STARTTLS based on your SMTP provider
 
 **Frontend:**
+
 1. Deploy frontend with gallery page implementation
 2. Set `API_BASE_URL` to your frontend URL (e.g., `https://photobox-frontend.com`)
 3. Implement `/gallery/{external_id}` page on frontend
@@ -1082,11 +1089,3 @@ ATAMS provides automatic exception handling:
 -   API specifications: [docs/endpoint.md](docs/endpoint.md)
 -   Project instructions: [CLAUDE.md](CLAUDE.md)
 -   ATAMS toolkit: See official ATAMS documentation
-
-## Support
-
-For questions or issues:
-
--   Project repository: [GitHub Issues](https://github.com/[username]/photobox-api/issues)
--   ATAMS toolkit: See ATAMS documentation
--   Xendit integration: [Xendit API Docs](https://developers.xendit.co/)

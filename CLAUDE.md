@@ -412,8 +412,8 @@ CORS_ALLOW_CREDENTIALS=false
 ### Transaction Creation Flow
 
 1. **Create Transaction**: `POST /api/v1/transactions`
-   - Requires: `location_id`, `price_id`, `email`, `send_invoice`
-   - Returns: `external_id`, `qr_string`, and transaction details
+    - Requires: `location_id`, `price_id`, `email`, `send_invoice`
+    - Returns: `external_id`, `qr_string`, and transaction details
 2. **Display QR Code**: Use `qr_string` to generate QR code image
 3. **Start Polling**: Begin polling transaction status
 
@@ -445,20 +445,20 @@ Status transitions are one-way only. Terminal states are final.
 After payment is completed:
 
 1. **Upload Photos**: `POST /api/v1/transactions/{external_id}/photos`
-   - Requires: Multipart form data with photo files (JPG/JPEG/PNG, ≤10MB each)
-   - System automatically sends email with gallery link
+    - Requires: Multipart form data with photo files (JPG/JPEG/PNG, ≤10MB each)
+    - System automatically sends email with gallery link
 2. **Email Notification**: Customer receives email with:
-   - Gallery URL: `{API_BASE_URL}/gallery/{external_id}`
-   - Optional invoice (if `send_invoice=true`)
-   - Expiration notice (14 days)
+    - Gallery URL: `{API_BASE_URL}/gallery/{external_id}`
+    - Optional invoice (if `send_invoice=true`)
+    - Expiration notice (14 days)
 
 ### Photo Gallery Page
 
 Frontend must implement `/gallery/{external_id}` page:
 
 1. **Fetch Photos**: `GET /api/v1/transactions/{external_id}/photos`
-   - Returns: `photo_count`, `email_sent_at`, `expiry_date`, and `photos` array
-   - **Response Encryption**: If `ENCRYPTION_ENABLED=true`, decrypt response
+    - Returns: `photo_count`, `email_sent_at`, `expiry_date`, and `photos` array
+    - **Response Encryption**: If `ENCRYPTION_ENABLED=true`, decrypt response
 2. **Display**: Show photos with countdown to expiration
 3. **Download**: Allow batch download of all photos
 
@@ -537,18 +537,21 @@ The `001_initial_schema.sql` includes:
 ### Schema Details
 
 **master_locations**:
-- `ml_machine_code`: Unique identifier for each photobox machine
-- `ml_is_active`: Controls if location accepts new transactions
+
+-   `ml_machine_code`: Unique identifier for each photobox machine
+-   `ml_is_active`: Controls if location accepts new transactions
 
 **master_price**:
-- Uses UUID for `mp_id` (supports distributed systems)
-- `mp_quota`: NULL means unlimited, otherwise tracks remaining quota
-- `mp_is_active`: Controls if price is available for transactions
+
+-   Uses UUID for `mp_id` (supports distributed systems)
+-   `mp_quota`: NULL means unlimited, otherwise tracks remaining quota
+-   `mp_is_active`: Controls if price is available for transactions
 
 **transactions**:
-- `tr_email`: Customer email for photo delivery
-- `tr_send_invoice`: Flag to include invoice in email
-- `tr_email_sent_at`: Timestamp when photos were emailed (triggers 14-day expiration)
+
+-   `tr_email`: Customer email for photo delivery
+-   `tr_send_invoice`: Flag to include invoice in email
+-   `tr_email_sent_at`: Timestamp when photos were emailed (triggers 14-day expiration)
 
 ## Testing
 
